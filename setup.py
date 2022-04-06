@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 HERE = pathlib.Path(__file__).parent
 
 VERSION = '0.0.1'
-PACKAGE_NAME = 'jax-qf'
+PACKAGE_NAME = 'jax-quant-finance'
 AUTHOR = 'luweizheng'
 AUTHOR_EMAIL = 'luweizheng36@hotmail.com'
 URL = 'https://github.com/luweizheng/jax-quant-finance'
