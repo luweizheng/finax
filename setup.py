@@ -9,7 +9,7 @@ AUTHOR = 'luweizheng'
 AUTHOR_EMAIL = 'luweizheng36@hotmail.com'
 URL = 'https://github.com/luweizheng/jax-quant-finance'
 
-LICENSE = 'GPL'
+LICENSE = 'GPLv3'
 DESCRIPTION = 'High Performance Quantative Finance Library on JAX'
 LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"

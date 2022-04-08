@@ -1,4 +1,6 @@
 """Black Scholes prices of European options."""
+from typing import Union
+
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -31,7 +33,7 @@ def option_price(*,
                  discount_factors = None,
                  is_call_options = None,
                  is_normal_volatility: bool = False,
-                 dtype = jnp.float32,
+                 dtype:jnp.dtype = jnp.float64,
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of call or put options.
 
@@ -116,22 +118,22 @@ def option_price(*,
         supplied.
         ValueError: If both `discount_rates` and `discount_factors` is supplied.
     """
+    print(type(expiries))
     if (spots is None) == (forwards is None):
         raise ValueError('Either spots or forwards must be supplied but not both.')
     if (discount_rates is not None) and (discount_factors is not None):
         raise ValueError('At most one of discount_rates and discount_factors may '
                         'be supplied')
     
-    dtype = dtype or jnp.float32
-    
+    dtype = dtype or jnp.float64
 
     if discount_rates is not None:
         discount_factors = jnp.exp(-discount_rates * expiries)    
     elif discount_factors is not None:
         discount_rates = -jnp.log(discount_factors) / expiries
     else:
-        discount_rates = jnp.asarray(0.0, dtype=dtype)
-        discount_factors = jnp.asarray(1.0, dtype=dtype)
+        discount_rates = jnp.array(0.0, dtype=dtype)
+        discount_factors = jnp.array(1.0, dtype=dtype)
 
     if dividend_rates is None:
         dividend_rates = jnp.asarray(0.0, dtype=dtype)
