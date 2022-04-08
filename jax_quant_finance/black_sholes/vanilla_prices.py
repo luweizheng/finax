@@ -118,7 +118,6 @@ def option_price(*,
         supplied.
         ValueError: If both `discount_rates` and `discount_factors` is supplied.
     """
-    print(type(expiries))
     if (spots is None) == (forwards is None):
         raise ValueError('Either spots or forwards must be supplied but not both.')
     if (discount_rates is not None) and (discount_factors is not None):
