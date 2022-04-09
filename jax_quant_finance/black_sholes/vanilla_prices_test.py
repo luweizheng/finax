@@ -28,6 +28,43 @@ def test_option_prices():
     
     assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
 
+
+def test_option_prices_np():
+    """Tests that the BS prices are correct."""
+    
+    forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    strikes = np.array([3.0, 3.0, 3.0, 3.0, 3.0])
+    volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+    expiries = np.array(1.0)
+    option_price_fn = jit(option_price)
+    computed_prices = option_price_fn(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards)
+    expected_prices = np.array(
+        [0.0, 2.0, 2.0480684764112578, 1.0002029716043364, 2.0730313058959933], dtype=np.float64)
+    
+    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+
+
+def test_option_prices_list():
+    """Tests that the BS prices are correct."""
+    
+    forwards = [1.0, 2.0, 3.0, 4.0, 5.0]
+    strikes = [3.0, 3.0, 3.0, 3.0, 3.0]
+    volatilities = [0.0001, 102.0, 2.0, 0.1, 0.4]
+    expiries = 1.0
+    option_price_fn = jit(option_price)
+    computed_prices = option_price_fn(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards)
+    expected_prices = [0.0, 2.0, 2.0480684764112578, 1.0002029716043364, 2.0730313058959933]
+    
+    assert jnp.all(jnp.allclose(jnp.asarray(expected_prices), computed_prices, 1e-10))
+
 def test_option_prices_normal():
     """Tests that the prices using normal model are correct."""
     dtype = jnp.float64

@@ -1,5 +1,5 @@
 """Black Scholes prices of European options."""
-from typing import Union
+from typing import Union, List
 
 import numpy as np
 import jax
@@ -20,20 +20,19 @@ _SQRT_2 = np.sqrt(2.0, dtype=np.float64)
 @jit
 def _ncdf(x):
   return (jax.lax.erf(x / _SQRT_2) + 1) / 2
-
-
+    
 def option_price(*,
-                 volatilities,
-                 strikes,
-                 expiries,
-                 spots = None,
-                 forwards = None,
-                 discount_rates = None,
-                 dividend_rates = None,
-                 discount_factors = None,
-                 is_call_options = None,
+                 volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
+                 strikes: Union[jnp.ndarray, np.ndarray, List[float]],
+                 expiries: Union[jnp.ndarray, np.ndarray, List[float]],
+                 spots: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                 forwards: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                 discount_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                 dividend_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                 discount_factors: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                 is_call_options: Union[jnp.ndarray, np.ndarray, List[bool]] = None,
                  is_normal_volatility: bool = False,
-                 dtype:jnp.dtype = jnp.float64,
+                 dtype: jnp.dtype = jnp.float64
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of call or put options.
 
@@ -118,7 +117,7 @@ def option_price(*,
         supplied.
         ValueError: If both `discount_rates` and `discount_factors` is supplied.
     """
-    print(type(expiries))
+    
     if (spots is None) == (forwards is None):
         raise ValueError('Either spots or forwards must be supplied but not both.')
     if (discount_rates is not None) and (discount_factors is not None):
@@ -126,29 +125,41 @@ def option_price(*,
                         'be supplied')
     
     dtype = dtype or jnp.float64
+    strikes = jnp.asarray(strikes, dtype=dtype)
+    volatilities = jnp.asarray(volatilities, dtype=dtype)
+    expiries = jnp.asarray(expiries, dtype=dtype)
 
     if discount_rates is not None:
+        discount_rates = jnp.asarray(discount_rates, dtype=dtype)
         discount_factors = jnp.exp(-discount_rates * expiries)    
     elif discount_factors is not None:
+        discount_factors = jnp.asarray(discount_factors, dtype=dtype)
         discount_rates = -jnp.log(discount_factors) / expiries
     else:
-        discount_rates = jnp.array(0.0, dtype=dtype)
-        discount_factors = jnp.array(1.0, dtype=dtype)
+        discount_rates = jnp.asarray(0.0, dtype=dtype)
+        discount_factors = jnp.asarray(1.0, dtype=dtype)
 
     if dividend_rates is None:
         dividend_rates = jnp.asarray(0.0, dtype=dtype)
 
-    if forwards is None:
+    # if forwards is None, spots must be supplied.
+    if forwards is not None:
+        forwards = jnp.asarray(forwards, dtype=dtype)
+    else:
+        spots = jnp.asarray(spots, dtype=dtype)
         forwards = spots * jnp.exp((discount_rates - dividend_rates) * expiries)
 
     sqrt_var = volatilities * jnp.sqrt(expiries)
-    if not is_normal_volatility:  # lognormal model
+    
+    # lognormal model
+    if not is_normal_volatility:
         d1 = divide_no_nan(jnp.log(forwards / strikes), sqrt_var) + sqrt_var / 2
         d2 = d1 - sqrt_var
         undiscounted_calls = jnp.where(sqrt_var > 0,
                                     forwards * _ncdf(d1) - strikes * _ncdf(d2),
                                     jnp.maximum(forwards - strikes, 0.0))
-    else:  # normal model
+      # normal model
+    else:
         d1 = divide_no_nan((forwards - strikes), sqrt_var)
         undiscounted_calls = jnp.where(
             sqrt_var > 0.0, (forwards - strikes) * _ncdf(d1) +
