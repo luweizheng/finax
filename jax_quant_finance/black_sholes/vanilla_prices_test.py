@@ -26,7 +26,7 @@ def test_option_prices():
     expected_prices = jnp.array(
         [0.0, 2.0, 2.0480684764112578, 1.0002029716043364, 2.0730313058959933], dtype=np.float64)
     
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
 def test_option_prices_normal():
     """Tests that the prices using normal model are correct."""
@@ -44,7 +44,7 @@ def test_option_prices_normal():
 
     expected_prices = jnp.array(
         [0.0, 0.0, 0.0039894228040143, 0.0019947114020072, 0.0216663094117537], dtype=dtype)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
 def test_option_prices_normal_float32():
     """Tests that the prices using normal model are correct."""
@@ -63,7 +63,7 @@ def test_option_prices_normal_float32():
 
     expected_prices = jnp.array(
         [0.0, 0.0, 0.0039894228040143, 0.0019947114020072, 0.0216663094117537], dtype=dtype)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-6))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-6)
 
 def test_price_zero_vol():
     """Tests that zero volatility is handled correctly."""
@@ -83,7 +83,7 @@ def test_price_zero_vol():
             forwards=forwards,
             is_call_options=is_call_options,
             dtype=jnp.float64)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
 def test_price_zero_expiry():
     """Tests that zero expiry is correctly handled."""
@@ -101,7 +101,7 @@ def test_price_zero_expiry():
             forwards=forwards,
             is_call_options=is_call_options,
             dtype=jnp.float64)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
 def test_price_long_expiry_calls():
     """Tests that very long expiry call option behaves like the asset."""
@@ -116,7 +116,7 @@ def test_price_long_expiry_calls():
             expiries=expiries,
             forwards=forwards,
             dtype=jnp.float64)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
 def test_price_vol_and_expiry_scaling():
     """Tests that the price is invariant under vol->k vol, T->T/k**2."""
@@ -138,7 +138,7 @@ def test_price_vol_and_expiry_scaling():
             expiries=expiries / scaling / scaling,
             forwards=forwards,
             dtype=jnp.float64)
-    assert jnp.all(jnp.allclose(base_prices, scaled_prices, 1e-10))
+    assert jnp.allclose(base_prices, scaled_prices, 1e-10)
 
 def test_option_prices_detailed_discount():
     """Tests the prices with discount_rates."""
@@ -161,9 +161,7 @@ def test_option_prices_detailed_discount():
             dtype=jnp.float64)
     expected_prices = jnp.array(
         [0.03, 0.57, 3.42, 9.85, 18.62, 20.41, 11.25, 4.40, 1.12, 0.18])
-    # 此处需要注意：原tensorflow中的控制精度是5e-3，
-    # 而本代码此精度无法通过测试下调至5e-2则可以调试通过，
-    # 应当考虑是什么原因导致的，并尝试修改    
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 5e-2))
+    
+    assert jnp.allclose(expected_prices, computed_prices, atol=5e-3)
 
 
