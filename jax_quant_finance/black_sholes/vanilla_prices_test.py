@@ -6,7 +6,7 @@ from jax.config import config
 config.update("jax_enable_x64", True)
 
 from jax import jit
-
+from jax import random
 from jax_quant_finance.black_sholes.vanilla_prices import option_price
 
 
@@ -26,7 +26,7 @@ def test_option_prices():
     expected_prices = jnp.array(
         [0.0, 2.0, 2.0480684764112578, 1.0002029716043364, 2.0730313058959933], dtype=np.float64)
     
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
 
 def test_option_prices_np():
@@ -81,8 +81,26 @@ def test_option_prices_normal():
 
     expected_prices = jnp.array(
         [0.0, 0.0, 0.0039894228040143, 0.0019947114020072, 0.0216663094117537], dtype=dtype)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
+def test_option_prices_normal_float32():
+    """Tests that the prices using normal model are correct."""
+    dtype = jnp.float32
+    forwards = jnp.array([0.01, 0.02, 0.03, 0.03, 0.05], dtype=dtype)
+    strikes = jnp.array([0.03, 0.03, 0.03, 0.03, 0.03], dtype=dtype)
+    volatilities = jnp.array([0.0001, 0.001, 0.01, 0.005, 0.02], dtype=dtype)
+    expiries = 1.0
+    computed_prices = option_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards,
+            is_normal_volatility=True,
+            dtype=dtype)
+
+    expected_prices = jnp.array(
+        [0.0, 0.0, 0.0039894228040143, 0.0019947114020072, 0.0216663094117537], dtype=dtype)
+    assert jnp.allclose(expected_prices, computed_prices, 1e-6)
 
 def test_price_zero_vol():
     """Tests that zero volatility is handled correctly."""
@@ -102,24 +120,85 @@ def test_price_zero_vol():
             forwards=forwards,
             is_call_options=is_call_options,
             dtype=jnp.float64)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-10))
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
-
-def test_option_prices_normal_float32():
-    """Tests that the prices using normal model are correct."""
-    dtype = jnp.float32
-    forwards = jnp.array([0.01, 0.02, 0.03, 0.03, 0.05], dtype=dtype)
-    strikes = jnp.array([0.03, 0.03, 0.03, 0.03, 0.03], dtype=dtype)
-    volatilities = jnp.array([0.0001, 0.001, 0.01, 0.005, 0.02], dtype=dtype)
-    expiries = 1.0
+def test_price_zero_expiry():
+    """Tests that zero expiry is correctly handled."""
+    # If the expiry is zero, the option's value should be correct.
+    forwards = jnp.array([1.0, 1.0, 1.0, 1.0])
+    strikes = jnp.array([1.1, 0.9, 1.1, 0.9])
+    volatilities = jnp.array([0.1, 0.2, 0.5, 0.9])
+    expiries = 0.0
+    is_call_options = jnp.array([True, True, False, False])
+    expected_prices = jnp.array([0.0, 0.1, 0.1, 0.0])
     computed_prices = option_price(
             volatilities=volatilities,
             strikes=strikes,
             expiries=expiries,
             forwards=forwards,
-            is_normal_volatility=True,
-            dtype=dtype)
+            is_call_options=is_call_options,
+            dtype=jnp.float64)
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
 
+def test_price_long_expiry_calls():
+    """Tests that very long expiry call option behaves like the asset."""
+    forwards = jnp.array([1.0, 1.0, 1.0, 1.0])
+    strikes = jnp.array([1.1, 0.9, 1.1, 0.9])
+    volatilities = jnp.array([0.1, 0.2, 0.5, 0.9])
+    expiries = 1e10
+    expected_prices = forwards
+    computed_prices = option_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards,
+            dtype=jnp.float64)
+    assert jnp.allclose(expected_prices, computed_prices, 1e-10)
+
+def test_price_vol_and_expiry_scaling():
+    """Tests that the price is invariant under vol->k vol, T->T/k**2."""
+    key = random.PRNGKey(1234)
+    forwards = jnp.exp(random.normal(key))
+    volatilities = jnp.exp(random.normal(key) / 2)
+    strikes = jnp.exp(random.normal(key))
+    expiries = jnp.exp(random.normal(key))
+    scaling = 5.0
+    base_prices = option_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards,
+            dtype=jnp.float64)
+    scaled_prices = option_price(
+            volatilities=volatilities * scaling,
+            strikes=strikes,
+            expiries=expiries / scaling / scaling,
+            forwards=forwards,
+            dtype=jnp.float64)
+    assert jnp.allclose(base_prices, scaled_prices, 1e-10)
+
+def test_option_prices_detailed_discount():
+    """Tests the prices with discount_rates."""
+    spots = jnp.array([80.0, 90.0, 100.0, 110.0, 120.0] * 2)
+    strikes = jnp.array([100.0] * 10)
+    discount_rates = 0.08
+    volatilities = 0.2
+    expiries = 0.25
+
+    is_call_options = jnp.array([True] * 5 + [False] * 5)
+    dividend_rates = 0.12
+    computed_prices = option_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            spots=spots,
+            discount_rates=discount_rates,
+            dividend_rates=dividend_rates,
+            is_call_options=is_call_options,
+            dtype=jnp.float64)
     expected_prices = jnp.array(
-        [0.0, 0.0, 0.0039894228040143, 0.0019947114020072, 0.0216663094117537], dtype=dtype)
-    assert jnp.all(jnp.allclose(expected_prices, computed_prices, 1e-6))
+        [0.03, 0.57, 3.42, 9.85, 18.62, 20.41, 11.25, 4.40, 1.12, 0.18])
+    
+    assert jnp.allclose(expected_prices, computed_prices, atol=5e-3)
+
+
