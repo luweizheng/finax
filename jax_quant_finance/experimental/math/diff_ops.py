@@ -11,9 +11,9 @@ def diff(x, order=1, exclusive=False, axis=-1, dtype=None, name=None):
     x0 = x[:-order:1]
     x1 = x[order::1]
     exclusive_diff = x1 - x0
-    exclusive_diff = jnp.asarray(exclusive_diff, dtype=dtype)
+    # exclusive_diff = jnp.asarray(exclusive_diff, dtype=dtype)
 
     if exclusive:
         return exclusive_diff
     # slices[axis] = slice(None, order)
-    return jnp.concatenate([jnp.asarray(x[0:order], dtype=dtype), exclusive_diff], axis=axis)
+    return jnp.concatenate([x[0:order], exclusive_diff], axis=axis)

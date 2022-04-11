@@ -7,7 +7,7 @@ import numpy as np
 
 x = jnp.asarray([1,2,3,4,5])
 order = 2
-dx = diff(x, order=order, exclusive=True)
+dx = diff(x, order=order, exclusive=False)
 # _x = np.array(x[::])
 # slices = 1 * [slice(None)]
 # slices[-1] = slice(None, 2)
