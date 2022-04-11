@@ -8,14 +8,15 @@ from jax.ops import segment_sum
 TODO: ADD Error Control and document
 """
 
-def present_value(cashflows, discount_factors, dtype=None, name=None):
-    cashflows = jnp.asarray(cashflows, dtype=dtype, name='cashflows')
+def present_value(cashflows, discount_factors, dtype=jnp.float64):
     dtype = dtype or cashflows.dtype
+    
+    cashflows = jnp.asarray(cashflows, dtype=dtype)
     discounted = cashflows * discount_factors
     return jnp.sum(discounted, axis=-1)
 
 
-def pv_from_yields(cashflows, times, yields, groups=None, dtype=None, name=None):
+def pv_from_yields(cashflows, times, yields, dtype=jnp.float64):
     """
     Need to be fixed
     jax.lax.gather is a little hard to understand
@@ -27,17 +28,10 @@ def pv_from_yields(cashflows, times, yields, groups=None, dtype=None, name=None)
     yields = jnp.asarray(yields, dtype=dtype)
 
     cashflows_yields = yields
-
-    if groups is not None:
-        groups = jnp.asarray(groups)
-        #  gather not working
-        cashflows_yields = yields
     
     discounted = cashflows * jnp.exp(-times * cashflows_yields)
 
-    if groups is not None:
-        return segment_sum.segment_sum(discounted, groups)
-    return jnp.sum(discounted, keepdims=True)
+    return jnp.sum(discounted)
 
 
 
