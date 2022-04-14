@@ -1,7 +1,5 @@
 import jax.numpy as jnp
 from jax.lax import while_loop
-from jax import jit
-import numpy as np
 from jax.ops import segment_sum
 
 """"
@@ -60,7 +58,7 @@ def yields_from_pv(cashflows, times, present_values, groups=None, tolerance=1e-8
     yields0 = jnp.zeros_like(present_values)
 
 
-    # cond_func must be lambda
+    # cond_func with condition control must be lambda
     _cond = lambda vals : jnp.logical_not(vals[0])
 
 

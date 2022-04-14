@@ -6,6 +6,7 @@ def forward_rates(df_start_dates, df_end_dates, daycount_fractions, dtype=None, 
     df_end_dates = jnp.asarray(df_end_dates, dtype=None)
     daycount_fractions = jnp.asarray(daycount_fractions, dtype=dtype)
 
+    # divide no nan
     # use double where tricks https://github.com/google/jax/issues/5039 to enable grad work normally
     _df_end_dates = jnp.where(df_end_dates==0.0, 1.0, df_end_dates)
     daycount = jnp.where(df_end_dates==0.0, 1.0, df_start_dates/_df_end_dates)
