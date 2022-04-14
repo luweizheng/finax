@@ -590,3 +590,341 @@ def binary_price(*,
     predicate = jnp.broadcast_to(is_call_options, undiscounted_calls.shape)
     return discount_factors * jnp.where(predicate, undiscounted_calls,
                                         undiscounted_puts)
+
+
+def asset_or_nothing_price(*,
+                            volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
+                            strikes: Union[jnp.ndarray, np.ndarray, List[float]],
+                            expiries: Union[jnp.ndarray, np.ndarray, List[float]],
+                            spots: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                            forwards: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                            discount_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                            dividend_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                            discount_factors: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                            is_call_options: Union[jnp.ndarray, np.ndarray, List[bool]] = None,
+                            is_normal_volatility: jnp.bool_ = False,
+                            dtype: jnp.dtype = jnp.float64
+                            ) -> jnp.ndarray:
+  """Computes the Black Scholes price for a batch of asset-or-nothing options.
+
+  The asset-or-nothing call (resp. put) pays out one unit of the underlying
+  asset if the spot is above (resp. below) the strike at maturity.
+
+  #### Example
+
+  ```python
+    # Price a batch of 5 asset_or_nothing call and put options.
+    volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+    forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    # Strikes will automatically be broadcasted to shape [5].
+    strikes = np.array([3.0])
+    # Expiries will be broadcast to shape [5], i.e. each option has strike=3
+    # and expiry = 1.
+    expiries = 1.0
+    computed_prices = tff.black_scholes.asset_or_nothing_price(
+        volatilities=volatilities,
+        strikes=strikes,
+        expiries=expiries,
+        forwards=forwards)
+  # Expected print output of prices:
+  # [0., 2., 2.52403424, 3.99315108, 4.65085383]
+  ```
+
+  #### References:
+
+  [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
+  [2] https://en.wikipedia.org/wiki/Binary_option#Asset-or-nothing_call
+
+  Args:
+    volatilities: Real `Tensor` of any shape and dtype. The volatilities to
+      expiry of the options to price.
+    strikes: A real `Tensor` of the same dtype and compatible shape as
+      `volatilities`. The strikes of the options to be priced.
+    expiries: A real `Tensor` of same dtype and compatible shape as
+      `volatilities`. The expiry of each option.
+    spots: A real `Tensor` of any shape that broadcasts to the shape of the
+      `volatilities`. The current spot price of the underlying. Either this
+      argument or the `forwards` (but not both) must be supplied.
+    forwards: A real `Tensor` of any shape that broadcasts to the shape of
+      `volatilities`. The forwards to maturity. Either this argument or the
+      `spots` must be supplied but both must not be supplied.
+    discount_rates: An optional real `Tensor` of same dtype as the
+      `volatilities` and of the shape that broadcasts with `volatilities`. If
+      not `None`, discount factors are calculated as e^(-rT), where r are the
+      discount rates, or risk free rates. At most one of discount_rates and
+      discount_factors can be supplied.
+      Default value: `None`, equivalent to r = 0 and discount factors = 1 when
+        discount_factors also not given.
+    dividend_rates: An optional real `Tensor` of same dtype as the
+      `volatilities` and of the shape that broadcasts with `volatilities`.
+      Default value: `None`, equivalent to q = 0.
+    discount_factors: An optional real `Tensor` of same dtype as the
+      `volatilities`. If not `None`, these are the discount factors to expiry
+      (i.e. e^(-rT)). Mutually exclusive with discount_rates. If neither is
+      given, no discounting is applied (i.e. the undiscounted option price is
+      returned). If `spots` is supplied and `discount_factors` is not `None`
+      then this is also used to compute the forwards to expiry. At most one of
+      `discount_rates` and `discount_factors` can be supplied.
+      Default value: `None`, which maps to e^(-rT) calculated from
+        discount_rates.
+    is_call_options: A boolean `Tensor` of a shape compatible with
+      `volatilities`. Indicates whether the option is a call (if True) or a put
+      (if False). If not supplied, call options are assumed.
+    is_normal_volatility: An optional Python boolean specifying whether the
+      `volatilities` correspond to lognormal Black volatility (if False) or
+      normal Black volatility (if True).
+      Default value: False, which corresponds to lognormal volatility.
+    dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
+      of any supplied non-`Tensor` arguments to `Tensor`.
+      Default value: `None` which maps to the default dtype inferred by
+        TensorFlow.
+    name: str. The name for the ops created by this function.
+      Default value: `None`, which is mapped to the default name
+        `asset_or_nothing_price`.
+
+  Returns:
+    option_prices: A `Tensor` of the same shape as `forwards`. The Black
+    Scholes price of the options.
+
+  Raises:
+    ValueError: If both `forwards` and `spots` are supplied or if neither is
+      supplied.
+    ValueError: If both `discount_rates` and `discount_factors` is supplied.
+  """
+    if (spots is None) == (forwards is None):
+        raise ValueError('Either spots or forwards must be supplied but not both.')
+    if (discount_rates is not None) and (discount_factors is not None):
+        raise ValueError('At most one of discount_rates and discount_factors may '
+                        'be supplied')
+
+  
+    dtype = dtype or jnp.float64
+    strikes = jnp.asarray(strikes, dtype=dtype)
+    
+    volatilities = jnp.asarray(volatilities, dtype=dtype)
+    expiries = jnp.asarray(expiries, dtype=dtype)
+
+    if discount_rates is not None:
+        discount_rates = jnp.asarray(discount_rates, dtype=dtype)
+        discount_factors = jnp.exp(-discount_rates * expiries)    
+    elif discount_factors is not None:
+        discount_factors = jnp.asarray(discount_factors, dtype=dtype)
+        discount_rates = -jnp.log(discount_factors) / expiries
+    else:
+        discount_rates = jnp.asarray(0.0, dtype=dtype)
+        discount_factors = jnp.asarray(1.0, dtype=dtype)
+
+    if dividend_rates is None:
+        dividend_rates = jnp.asarray(0.0, dtype=dtype)
+
+    # if forwards is None, spots must be supplied.
+    if forwards is not None:
+        forwards = jnp.asarray(forwards, dtype=dtype)
+    else:
+        spots = jnp.asarray(spots, dtype=dtype)
+        forwards = spots * jnp.exp((discount_rates - dividend_rates) * expiries)
+
+    sqrt_var = volatilities * jnp.sqrt(expiries)
+
+    if not is_normal_volatility:  # lognormal model
+        d1 = divide_no_nan(jnp.log(forwards / strikes),
+                                    sqrt_var) + sqrt_var / 2
+        undiscounted_calls = jnp.where(sqrt_var > 0, forwards * _ncdf(d1),
+                                    jnp.where(forwards > strikes, forwards, 0.))
+    else:  # normal model
+        d1 = divide_no_nan((forwards - strikes), sqrt_var)
+        undiscounted_calls = jnp.where(
+            sqrt_var > 0.0,
+            forwards * _ncdf(d1) +
+            sqrt_var * jnp.exp(-0.5 * d1**2) / jnp.sqrt(2 * 3.14159265),
+            jnp.where(forwards > strikes, forwards, 0.))
+
+    if is_call_options is None:
+        return discount_factors * undiscounted_calls
+    undiscounted_puts = forwards - undiscounted_calls
+    predicate = jnp.broadcast_to(is_call_options, undiscounted_calls.shape)
+    return discount_factors * jnp.where(predicate, undiscounted_calls,
+                                        undiscounted_puts)
+
+def swaption_price(*,
+                   volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
+                   expiries: Union[jnp.ndarray, np.ndarray, List[float]],
+                   floating_leg_start_times: Union[jnp.ndarray, np.ndarray, List[float]],
+                   floating_leg_end_times: Union[jnp.ndarray, np.ndarray, List[float]],
+                   fixed_leg_payment_times: Union[jnp.ndarray, np.ndarray, List[float]],
+                   floating_leg_daycount_fractions: Union[jnp.ndarray, np.ndarray, List[float]],
+                   fixed_leg_daycount_fractions: Union[jnp.ndarray, np.ndarray, List[float]],
+                   fixed_leg_coupon: Union[jnp.ndarray, np.ndarray, List[float]],
+                   floating_leg_start_times_discount_factors: Union[jnp.ndarray, np.ndarray, List[float]],
+                   floating_leg_end_times_discount_factors: Union[jnp.ndarray, np.ndarray, List[float]],
+                   fixed_leg_payment_times_discount_factors: Union[jnp.ndarray, np.ndarray, List[float]],
+                   notional: Union[jnp.ndarray, np.ndarray, List[float]] = None,
+                   is_payer_swaption: jnp.bool_ = None,
+                   is_normal_volatility: jnp.bool_ = True,
+                   dtype: jnp.dtype = jnp.float64
+                   ) -> jnp.ndarray:
+  """Calculates the price of European Swaptions using the Black model.
+
+  A European Swaption is a contract that gives the holder an option to enter a
+  swap contract at a future date at a prespecified fixed rate. A swaption that
+  grants the holder to pay fixed rate and receive floating rate is called a
+  payer swaption while the swaption that grants the holder to receive fixed and
+  pay floating payments is called the receiver swaption. Typically the start
+  date (or the inception date) of the swap coincides with the expiry of the
+  swaption.
+
+  #### Example
+  The example shows how value a batch of 1y x 1y and 1y x 2y swaptions using the
+  Black (normal) model for the swap rate.
+
+  ````python
+  import numpy as np
+  import tensorflow.compat.v2 as tf
+  import tf_quant_finance as tff
+
+  dtype = tf.float64
+
+  volatilities = [0.01, 0.005]
+  expiries = [1.0, 1.0]
+  float_leg_start_times = [[1.0, 1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0],
+                            [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75]]
+  float_leg_end_times = [[1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0, 2.0],
+                          [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]]
+  fixed_leg_payment_times = [[1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0, 2.0],
+                              [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]]
+  float_leg_daycount_fractions = [[0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0],
+                                   [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                                   0.25]]
+  fixed_leg_daycount_fractions = [[0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0],
+                                   [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                                   0.25]]
+  fixed_leg_coupon = [0.011, 0.011]
+  discount_fn = lambda x: np.exp(-0.01 * np.array(x))
+  price = self.evaluate(
+  tff.black_scholes.swaption_price(
+      volatilities=volatilities,
+      expiries=expiries,
+      floating_leg_start_times=float_leg_start_times,
+      floating_leg_end_times=float_leg_end_times,
+      fixed_leg_payment_times=fixed_leg_payment_times,
+      floating_leg_daycount_fractions=float_leg_daycount_fractions,
+      fixed_leg_daycount_fractions=fixed_leg_daycount_fractions,
+      fixed_leg_coupon=fixed_leg_coupon,
+      floating_leg_start_times_discount_factors=discount_fn(
+          float_leg_start_times),
+      floating_leg_end_times_discount_factors=discount_fn(
+          float_leg_end_times),
+      fixed_leg_payment_times_discount_factors=discount_fn(
+          fixed_leg_payment_times),
+      is_normal_volatility=is_normal_model,
+      notional=100.,
+      dtype=dtype))
+  # Expected value: [0.3458467885511461, 0.3014786656395892] # shape = (2,)
+  ````
+
+  Args:
+    volatilities: Real `Tensor` of any shape and dtype. The Black volatilities
+      of the swaptions to price. The shape of this input determines the number
+      (and shape) of swaptions to be priced and the shape of the output.
+    expiries: A real `Tensor` of same shape and dtype as `volatilities`. The
+      time to expiration of the swaptions.
+    floating_leg_start_times: A real `Tensor` of the same dtype as
+      `volatilities`. The times when accrual begins for each payment in the
+      floating leg. The shape of this input should be `expiries.shape + [m]` or
+      `batch_shape + [m]` where `m` denotes the number of floating payments in
+      each leg.
+    floating_leg_end_times: A real `Tensor` of the same dtype as `volatilities`.
+      The times when accrual ends for each payment in the floating leg. The
+      shape of this input should be `batch_shape + [m]` where `m` denotes
+      the number of floating payments in each leg.
+    fixed_leg_payment_times: A real `Tensor` of the same dtype as
+      `volatilities`.  The payment times for each payment in the fixed leg.
+      The shape of this input should be `batch_shape + [n]` where `n` denotes
+      the number of fixed payments in each leg.
+    floating_leg_daycount_fractions: A real `Tensor` of the same dtype and
+      compatible shape as `floating_leg_start_times`. The daycount fractions
+      for each payment in the floating leg.
+    fixed_leg_daycount_fractions: A real `Tensor` of the same dtype and
+      compatible shape as `fixed_leg_payment_times`. The daycount fractions
+      for each payment in the fixed leg.
+    fixed_leg_coupon: A real `Tensor` of the same dtype and shape compatible
+      to `batch_shape`. The fixed coupon rate for each payment in the fixed leg.
+    floating_leg_start_times_discount_factors: A real `Tensor` of the same
+      shape and dtype as `floating_leg_start_times`. The discount factors
+      corresponding to `floating_leg_start_times`.
+    floating_leg_end_times_discount_factors: A real `Tensor` of the same
+      shape and dtype as `floating_leg_end_times`. The discount factors
+      corresponding to `floating_leg_end_times`.
+    fixed_leg_payment_times_discount_factors: A real `Tensor` of the same
+      shape and dtype as `fixed_leg_payment_times`. The discount factors
+      corresponding to `fixed_leg_payment_times`.
+    notional: An optional `Tensor` of same dtype and compatible shape as
+      `volatilities` specifying the notional amount for the underlying swap.
+       Default value: None in which case the notional is set to 1.
+    is_payer_swaption: A boolean `Tensor` of a shape compatible with `expiries`.
+      Indicates whether the swaption is a payer (if True) or a receiver
+      (if False) swaption. If not supplied, payer swaptions are assumed.
+    is_normal_volatility: An optional Python boolean specifying whether the
+      `volatilities` correspond to normal Black volatility (if True) or
+      lognormal Black volatility (if False).
+      Default value: True, which corresponds to normal volatility.
+    dtype: The default dtype to use when converting values to `Tensor`s.
+      Default value: `None` which means that default dtypes inferred by
+      TensorFlow are used.
+    name: Python string. The name to give to the ops created by this function.
+      Default value: `None` which maps to the default name
+      `hw_swaption_price`.
+
+  Returns:
+    A `Tensor` of real dtype and shape `batch_shape` containing the
+    computed swaption prices.
+  """
+  name = name or 'black_swaption_price'
+  del floating_leg_daycount_fractions
+  with tf.name_scope(name):
+    volatilities = tf.convert_to_tensor(volatilities, dtype=dtype,
+                                        name='volatilities')
+    dtype = dtype or volatilities.dtype
+    expiries = tf.convert_to_tensor(expiries, dtype=dtype, name='expiries')
+    floating_leg_start_times = tf.convert_to_tensor(
+        floating_leg_start_times, dtype=dtype, name='float_leg_start_times')
+    floating_leg_end_times = tf.convert_to_tensor(
+        floating_leg_end_times, dtype=dtype, name='float_leg_end_times')
+    fixed_leg_payment_times = tf.convert_to_tensor(
+        fixed_leg_payment_times, dtype=dtype, name='fixed_leg_payment_times')
+    fixed_leg_daycount_fractions = tf.convert_to_tensor(
+        fixed_leg_daycount_fractions, dtype=dtype,
+        name='fixed_leg_daycount_fractions')
+    fixed_leg_coupon = tf.convert_to_tensor(
+        fixed_leg_coupon, dtype=dtype, name='fixed_leg_coupon')
+    float_leg_start_times_discount_factors = tf.convert_to_tensor(
+        floating_leg_start_times_discount_factors, dtype=dtype,
+        name='float_leg_start_times_discount_factors')
+    float_leg_end_times_discount_factors = tf.convert_to_tensor(
+        floating_leg_end_times_discount_factors, dtype=dtype,
+        name='float_leg_end_times_discount_factors')
+    fixed_leg_payment_times_discount_factors = tf.convert_to_tensor(
+        fixed_leg_payment_times_discount_factors, dtype=dtype,
+        name='fixed_leg_payment_times_discount_factors')
+
+    notional = tf.convert_to_tensor(notional, dtype=dtype, name='notional')
+    if is_payer_swaption is None:
+      is_payer_swaption = True
+    is_payer_swaption = tf.convert_to_tensor(
+        is_payer_swaption, dtype=tf.bool, name='is_payer_swaption')
+
+    swap_annuity = tf.math.reduce_sum(
+        fixed_leg_daycount_fractions * fixed_leg_payment_times_discount_factors,
+        axis=-1)
+    forward_swap_rate = tf.math.reduce_sum(
+        float_leg_start_times_discount_factors -
+        float_leg_end_times_discount_factors, axis=-1) / swap_annuity
+    swaption_value = option_price(volatilities=volatilities,
+                                  strikes=fixed_leg_coupon,
+                                  expiries=expiries,
+                                  forwards=forward_swap_rate,
+                                  is_call_options=is_payer_swaption,
+                                  is_normal_volatility=is_normal_volatility,
+                                  dtype=dtype,
+                                  name=name + '_option_price')
+    return notional * swap_annuity * swaption_value
