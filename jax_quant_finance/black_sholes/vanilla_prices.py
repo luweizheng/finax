@@ -879,40 +879,27 @@ def swaption_price(*,
     A `Tensor` of real dtype and shape `batch_shape` containing the
     computed swaption prices.
   """
-  name = name or 'black_swaption_price'
-  del floating_leg_daycount_fractions
-  with tf.name_scope(name):
-    volatilities = tf.convert_to_tensor(volatilities, dtype=dtype,
-                                        name='volatilities')
-    dtype = dtype or volatilities.dtype
-    expiries = tf.convert_to_tensor(expiries, dtype=dtype, name='expiries')
-    floating_leg_start_times = tf.convert_to_tensor(
-        floating_leg_start_times, dtype=dtype, name='float_leg_start_times')
-    floating_leg_end_times = tf.convert_to_tensor(
-        floating_leg_end_times, dtype=dtype, name='float_leg_end_times')
-    fixed_leg_payment_times = tf.convert_to_tensor(
-        fixed_leg_payment_times, dtype=dtype, name='fixed_leg_payment_times')
-    fixed_leg_daycount_fractions = tf.convert_to_tensor(
-        fixed_leg_daycount_fractions, dtype=dtype,
-        name='fixed_leg_daycount_fractions')
-    fixed_leg_coupon = tf.convert_to_tensor(
-        fixed_leg_coupon, dtype=dtype, name='fixed_leg_coupon')
-    float_leg_start_times_discount_factors = tf.convert_to_tensor(
-        floating_leg_start_times_discount_factors, dtype=dtype,
-        name='float_leg_start_times_discount_factors')
-    float_leg_end_times_discount_factors = tf.convert_to_tensor(
-        floating_leg_end_times_discount_factors, dtype=dtype,
-        name='float_leg_end_times_discount_factors')
-    fixed_leg_payment_times_discount_factors = tf.convert_to_tensor(
-        fixed_leg_payment_times_discount_factors, dtype=dtype,
-        name='fixed_leg_payment_times_discount_factors')
+    #del floating_leg_daycount_fractions ##此行作用？
+    dtype = dtype or jnp.float64
+    strikes = jnp.asarray(strikes, dtype=dtype)
+    
+    volatilities = jnp.asarray(volatilities, dtype=dtype)
+    expiries = jnp.asarray(expiries, dtype=dtype)
+    floating_leg_start_times = jnp.asarray(floating_leg_start_times, dtype=dtype)
+    floating_leg_end_times = jnp.asarray(floating_leg_end_times, dtype=dtype)
+    fixed_leg_payment_times = jnp.asarray(fixed_leg_payment_times, dtype=dtype)
+    fixed_leg_daycount_fractions = jnp.asarray(fixed_leg_daycount_fractions, dtype=dtype)
+    fixed_leg_coupon = jnp.asarray(fixed_leg_coupon, dtype=dtype)
+    float_leg_start_times_discount_factors = jnp.asarray(floating_leg_start_times_discount_factors)
+    float_leg_end_times_discount_factors = jnp.asarray(floating_leg_end_times_discount_factors)
+    fixed_leg_payment_times_discount_factors = jnp.asarray(fixed_leg_payment_times_discount_factors, dtype=dtype)
 
-    notional = tf.convert_to_tensor(notional, dtype=dtype, name='notional')
+    notional = jnp.asarray(notional, dtype=dtype, name='notional')
     if is_payer_swaption is None:
-      is_payer_swaption = True
-    is_payer_swaption = tf.convert_to_tensor(
-        is_payer_swaption, dtype=tf.bool, name='is_payer_swaption')
+        is_payer_swaption = True
+    is_payer_swaption = jnp.asarray(is_payer_swaption, dtype=jnp.bool_)
 
+    ##reduce_sum 接口如何实现？##
     swap_annuity = tf.math.reduce_sum(
         fixed_leg_daycount_fractions * fixed_leg_payment_times_discount_factors,
         axis=-1)
@@ -920,11 +907,11 @@ def swaption_price(*,
         float_leg_start_times_discount_factors -
         float_leg_end_times_discount_factors, axis=-1) / swap_annuity
     swaption_value = option_price(volatilities=volatilities,
-                                  strikes=fixed_leg_coupon,
-                                  expiries=expiries,
-                                  forwards=forward_swap_rate,
-                                  is_call_options=is_payer_swaption,
-                                  is_normal_volatility=is_normal_volatility,
-                                  dtype=dtype,
-                                  name=name + '_option_price')
+                                    strikes=fixed_leg_coupon,
+                                    expiries=expiries,
+                                    forwards=forward_swap_rate,
+                                    is_call_options=is_payer_swaption,
+                                    is_normal_volatility=is_normal_volatility,
+                                    dtype=dtype
+                                    )
     return notional * swap_annuity * swaption_value
