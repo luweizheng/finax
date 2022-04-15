@@ -378,18 +378,18 @@ def barrier_price(*,
     below_or_above = jnp.asarray(jnp.where(jnp.allclose(jnp.asarray(is_barrier_down), 0), -one, one),
                             dtype=jnp.float64)
 
-    '''
+    
     # Calculate params for integrals
-    sqrt_var = volatilities * tf.math.sqrt(expiries)
+    sqrt_var = volatilities * jnp.sqrt(expiries)
     mu = (discount_rates - dividend_rates) - ((volatilities**2) / 2)
     lamda = 1 + (mu / (volatilities**2))
-    x = (tf.math.log(spots / strikes) / (sqrt_var)) + (lamda * sqrt_var)
-    x1 = (tf.math.log(spots / barriers) / (sqrt_var)) + (lamda * sqrt_var)
-    y = (tf.math.log((barriers**2) / (spots * strikes)) / (
+    x = (jnp.log(spots / strikes) / (sqrt_var)) + (lamda * sqrt_var)
+    x1 = (jnp.log(spots / barriers) / (sqrt_var)) + (lamda * sqrt_var)
+    y = (jnp.log((barriers**2) / (spots * strikes)) / (
         sqrt_var)) + (lamda * sqrt_var)
-    y1 = (tf.math.log(barriers / spots) / (sqrt_var)) + (lamda * sqrt_var)
+    y1 = (jnp.log(barriers / spots) / (sqrt_var)) + (lamda * sqrt_var)
     b = ((mu**2) + (2 * (volatilities**2) * discount_rates)) / (volatilities**2)
-    z = (tf.math.log(barriers / spots) / (sqrt_var)) + (b * sqrt_var)
+    z = (tf.math.log(barriergs / spots) / (sqrt_var)) + (b * sqrt_var)
     a = mu / (volatilities**2)
 
     # Other params used for integrals
@@ -437,7 +437,7 @@ def barrier_price(*,
     cdf_mat = _ncdf(cdf_mat)
     # Calculating and returning price for each option
     return tf.reduce_sum(masks * terms_mat * cdf_mat, axis=strike_rank)
-    '''
+    ''''''
 
 def binary_price(*,
                  volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
