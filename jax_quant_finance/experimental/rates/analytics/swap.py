@@ -1,5 +1,7 @@
 import jax.numpy as jnp
 from jax_quant_finance.experimental.rates.analytics import cashflows
+from jax_quant_finance.experimental.math.dividend_no_nan import divide_no_nan
+from numpy import asarray
 
 
 def swap_price(pay_leg_cashflows,
@@ -22,7 +24,7 @@ def swap_price(pay_leg_cashflows,
                 receive_leg_cashflows=receive_leg_cashflows,
                 pay_leg_discount_factors=pay_leg_discount_factors,
                 receive_leg_discount_factors=receive_leg_discount_factors,
-                dtype=tf.float64)
+                dtype=jnp.float64)
     # Expected: [615.0, -302.5]
     ```
 
@@ -136,10 +138,244 @@ def equity_leg_cashflows(
   dividends = jnp.asarray(dividends, dtype=dtype)
   spots_expand = jnp.expand_dims(spots, axis=-1)
   forward_prices = jnp.concatenate([spots_expand, forward_prices], axis=-1)
-  pass
-"""
-TODO : dividend_no_nan?
-"""
+  return divide_no_nan(
+                        notional * (forward_prices[...,1:] - forward_prices[...,:-1])
+                       +dividends,
+                       forward_prices[...,:-1], dtype=dtype)
+
+
+def rate_leg_cashflows(coupon_rates,notional,daycount_fractions,dtype=None,name=None):
+  
+    coupon_rates = jnp.asarray(coupon_rates, dtype=dtype)
+    dtype = dtype or coupon_rates.dtype
+    daycount_fractions = jnp.asarray(daycount_fractions, dtype=dtype)
+    notional = jnp.asarray(notional, dtype=dtype)
+    
+    return notional * daycount_fractions * coupon_rates
+
+
+def ir_swap_price(
+    pay_leg_coupon_rates,
+    receive_leg_coupon_rates,
+    pay_leg_notional,
+    receive_leg_notional,
+    pay_leg_daycount_fractions,
+    receive_leg_daycount_fractions,
+    pay_leg_discount_factors,
+    receive_leg_discount_factors,
+    dtype=None,
+    name=None):
+    
+    pay_leg_coupon_rates = jnp.asarray(pay_leg_coupon_rates, dtype=dtype)
+    dtype = dtype or pay_leg_coupon_rates.dtype
+    receive_leg_coupon_rates = jnp.asarray(receive_leg_coupon_rates, dtype=dtype)
+    pay_leg_notional = jnp.asarray(pay_leg_notional, dtype=dtype)
+    receive_leg_notional = jnp.asarray(receive_leg_notional, dtype=dtype)
+    pay_leg_daycount_fractions = jnp.asarray(pay_leg_daycount_fractions, dtype=dtype)
+    receive_leg_daycount_fractions = jnp.asarray(receive_leg_daycount_fractions, dtype = dtype)
+    pay_leg_discount_factors = jnp.asarray(pay_leg_discount_factors, dtype=dtype)
+    receive_leg_discount_factors = jnp.asarray(receive_leg_discount_factors, dtype=dtype)
+    
+    pay_leg_cashflows = rate_leg_cashflows(
+      pay_leg_notional,
+      pay_leg_daycount_fractions,
+      pay_leg_coupon_rates
+    )
+    
+    receive_leg_cashflows = rate_leg_cashflows(
+      receive_leg_notional,
+      receive_leg_daycount_fractions,
+      receive_leg_coupon_rates
+    )
+    
+    return swap_price(pay_leg_cashflows, 
+                      receive_leg_cashflows, 
+                      pay_leg_discount_factors, 
+                      receive_leg_discount_factors)
+  
+  
+def ir_swap_par_rate_and_annuity(floating_leg_start_times,
+                                 floating_leg_end_times,
+                                 fixed_leg_payment_times,
+                                 fixed_leg_daycount_fractions,
+                                 reference_rate_fn,
+                                 dtype=None,
+                                 name=None):
+    """Utility function to compute par swap rate and annuity.
+
+  Args:
+    floating_leg_start_times: A real `Tensor` of the same dtype as `expiries`.
+      The times when accrual begins for each payment in the floating leg. The
+      shape of this input should be `expiries.shape + [m]` where `m` denotes the
+      number of floating payments in each leg.
+    floating_leg_end_times: A real `Tensor` of the same dtype as `expiries`. The
+      times when accrual ends for each payment in the floating leg. The shape of
+      this input should be `expiries.shape + [m]` where `m` denotes the number
+      of floating payments in each leg.
+    fixed_leg_payment_times: A real `Tensor` of the same dtype as `expiries`.
+      The payment times for each payment in the fixed leg. The shape of this
+      input should be `expiries.shape + [n]` where `n` denotes the number of
+      fixed payments in each leg.
+    fixed_leg_daycount_fractions: A real `Tensor` of the same dtype and
+      compatible shape as `fixed_leg_payment_times`. The daycount fractions for
+      each payment in the fixed leg.
+    reference_rate_fn: A Python callable that accepts expiry time as a real
+      `Tensor` and returns a `Tensor` of shape `input_shape + [dim]`. Returns
+      the continuously compounded zero rate at the present time for the input
+      expiry time.
+    dtype: `tf.Dtype`. If supplied the dtype for the input and output `Tensor`s.
+      Default value: None which maps to the default dtype inferred from
+        `floating_leg_start_times`.
+    name: Python str. The name to give to the ops created by this function.
+      Default value: None which maps to 'ir_swap_par_rate_and_annuity'.
+
+  Returns:
+    A tuple with two elements containing par swap rate and swap annuities.
+  """
+    floating_leg_start_times = jnp.asarray(floating_leg_start_times, dtype=dtype)
+    dtype = dtype or floating_leg_start_times.dtype
+    floating_leg_end_times = jnp.asarray(floating_leg_end_times, dtype=dtype)
+    fixed_leg_payment_times = jnp.asarray(fixed_leg_payment_times, dtype=dtype)
+    fixed_leg_daycount_fractions = jnp.asarray(fixed_leg_daycount_fractions, dtype=dtype)
+
+    floating_leg_start_df = jnp.exp(
+        -reference_rate_fn(floating_leg_start_times) * floating_leg_start_times)
+    floating_leg_end_df = jnp.exp(
+        -reference_rate_fn(floating_leg_end_times) * floating_leg_end_times)
+    fixed_leg_payment_df = jnp.exp(
+        -reference_rate_fn(fixed_leg_payment_times) * fixed_leg_payment_times)
+    annuity = jnp.sum(
+        fixed_leg_payment_df * fixed_leg_daycount_fractions, axis=-1)
+    swap_rate = jnp.sum(
+        floating_leg_start_df - floating_leg_end_df, axis=-1) / annuity
+    
+    return swap_rate, annuity
+  
+  
+def equity_swap_price(
+      rate_leg_coupon_rates,
+      equity_leg_forward_prices,
+      equity_leg_spots,
+      rate_leg_notional,
+      equity_leg_notional,
+      rate_leg_daycount_fractions,
+      rate_leg_discount_factors,
+      equity_leg_discount_factors,
+      equity_dividends=None,
+      is_equity_receiver=None,
+      dtype=None,
+      name=None):
+    """Computes prices of a batch of equity swaps.
+
+  The swap consists of an equity and interest rate legs.
+
+  #### Example
+  ```python
+  rate_leg_coupon_rates = [[0.1, 0.2, 0.05], [0.1, 0.05, 0.2]]
+  # Two cashflows of 4 and 3 payments, respectively
+  forward_prices = [[110, 120, 140, 150], [210, 220, 240, 0]]
+  spots = [100, 200]
+  notional = 1000
+  pay_leg_daycount_fractions = 0.5
+  rate_leg_daycount_fractions = [[0.5, 0.5, 0.5], [0.4, 0.5, 0.6]]
+  rate_leg_discount_factors = [[0.95, 0.9, 0.85], [0.98, 0.92, 0.88]]
+  equity_leg_discount_factors = [[0.95, 0.9, 0.85, 0.8],
+                                 [0.98, 0.92, 0.88, 0.0]]
+
+  equity_swap_price(
+      rate_leg_coupon_rates=rate_leg_coupon_rates,
+      equity_leg_forward_prices=forward_prices,
+      equity_leg_spots=spots,
+      rate_leg_notional=notional,
+      equity_leg_notional=notional,
+      rate_leg_daycount_fractions=rate_leg_daycount_fractions,
+      rate_leg_discount_factors=rate_leg_discount_factors,
+      equity_leg_discount_factors=equity_leg_discount_factors,
+      is_equity_receiver=[True, False],
+      dtype=tf.float64)
+  # Expected: [216.87770563, -5.00952381]
+  forward_rates(df_start_dates, df_end_dates, daycount_fractions,
+                dtype=tf.float64)
+  ```
+
+  Args:
+    rate_leg_coupon_rates: A real `Tensor` of shape
+      `batch_shape + [num_rate_cashflows]`, where `num_rate_cashflows` is the
+      number of cashflows for each batch element. Coupon rates for the
+      interest rate leg.
+    equity_leg_forward_prices: A `Tensor` of the same `dtype` as
+      `rate_leg_coupon_rates` and of shape
+      `batch_shape + [num_equity_cashflows]`, where `num_equity_cashflows` is
+      the number of cashflows for each batch element. Equity leg forward
+      prices.
+    equity_leg_spots: A `Tensor` of the same `dtype` as
+      `equity_leg_forward_prices` and of shape compatible with `batch_shape`.
+      Spot prices for each batch element of the equity leg.
+    rate_leg_notional: A `Tensor` of the same `dtype` as `rate_leg_coupon_rates`
+      and of compatible shape. Notional amount for each cashflow.
+    equity_leg_notional: A `Tensor` of the same `dtype` as
+      `equity_leg_forward_prices` and of compatible shape.  Notional amount for
+      each cashflow.
+    rate_leg_daycount_fractions: A `Tensor` of the same `dtype` as
+      `rate_leg_coupon_rates` and of compatible shape.  Year fractions for the
+      coupon accrual.
+    rate_leg_discount_factors: A `Tensor` of the same `dtype` as
+      `rate_leg_coupon_rates` and of compatible shape. Discount factors for each
+      cashflow of the rate leg.
+    equity_leg_discount_factors: A `Tensor` of the same `dtype` as
+      `equity_leg_forward_prices` and of compatible shape. Discount factors for
+      each cashflow of the equity leg.
+    equity_dividends: A `Tensor` of the same `dtype` as
+      `equity_leg_forward_prices` and of compatible shape. Dividends paid at the
+      leg reset times.
+      Default value: None which maps to zero dividend.
+    is_equity_receiver: A boolean `Tensor` of shape compatible with
+      `batch_shape`. Indicates whether the swap holder is equity holder or
+      receiver.
+      Default value: None which means that all swaps are equity reiver swaps.
+    dtype: `tf.Dtype`. If supplied the dtype for the input and output `Tensor`s.
+      Default value: None which maps to the default dtype inferred from
+      `rate_leg_coupon_rates`.
+    name: Python str. The name to give to the ops created by this function.
+      Default value: None which maps to 'equity_swap_price'.
+
+  Returns:
+    A `Tensor` of the same `dtype` as `rate_leg_coupon_rates` and of shape
+    `batch_shape`. Present values of the equity swaps.
+  """
+    rate_leg_coupon_rates = jnp.asarray(rate_leg_coupon_rates, dtype=dtype)
+    dtype = dtype or rate_leg_coupon_rates.dtype
+    equity_leg_forward_prices = jnp.asarray(equity_leg_forward_prices, dtype=dtype)
+    equity_leg_spots = jnp.asarray(equity_leg_spots, dtype=dtype)
+    rate_leg_daycount_fractions = jnp.asarray(rate_leg_daycount_fractions, dtype=dtype,)
+    equity_dividends = equity_dividends or 0
+    equity_dividends = jnp.asarray(equity_dividends, dtype=dtype,)
+    rate_leg_notional = jnp.asarray(rate_leg_notional, dtype=dtype)
+    equity_leg_notional = jnp.asarray(equity_leg_notional, dtype=dtype)
+    rate_leg_discount_factors = jnp.asarray(rate_leg_discount_factors, dtype=dtype)
+    equity_leg_discount_factors = jnp.asarray(equity_leg_discount_factors, dtype=dtype)
+    if is_equity_receiver is None:
+      is_equity_receiver = True
+    is_equity_receiver = jnp.asarray(is_equity_receiver, dtype=jnp.bool_)
+    one = jnp.ones([], dtype=dtype)
+    equity_receiver = jnp.where(is_equity_receiver, one, -one)
+    equity_cashflows = equity_leg_cashflows(
+        forward_prices=equity_leg_forward_prices,
+        spots=equity_leg_spots,
+        notional=equity_leg_notional,
+        dividends=equity_dividends)
+    rate_cashflows = rate_leg_cashflows(
+        coupon_rates=rate_leg_coupon_rates,
+        notional=rate_leg_notional,
+        daycount_fractions=rate_leg_daycount_fractions)
+    return equity_receiver * swap_price(
+        rate_cashflows,
+        equity_cashflows,
+        rate_leg_discount_factors,
+        equity_leg_discount_factors)
+  
+
+
     
 
   
