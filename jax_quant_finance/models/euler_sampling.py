@@ -3,9 +3,12 @@
 from typing import Callable, List, Optional, Union
 
 import numpy as np
+
+from jax import lax
 import jax.numpy as jnp
 
 from jax_quant_finance.math import random_sampler
+from jax_quant_finance.models import utils
 
 
 def sample(
@@ -262,32 +265,31 @@ def sample(
         dtype=dtype)
 
     if normal_draws is not None:
-      normal_draws = tf.convert_to_tensor(normal_draws, dtype=dtype,
-                                          name='normal_draws')
-      # Shape [num_time_points] + batch_shape + [num_samples, dim]
-      normal_draws_rank = normal_draws.shape.rank
-      perm = tf.concat(
-          [[normal_draws_rank-2], tf.range(normal_draws_rank-2),
-           [normal_draws_rank-1]], axis=0)
-      normal_draws = tf.transpose(normal_draws, perm=perm)
-      num_samples = tf.shape(normal_draws)[-2]
-      draws_dim = normal_draws.shape[-1]
-      if dim != draws_dim:
-        raise ValueError(
-            '`dim` should be equal to `normal_draws.shape[2]` but are '
-            '{0} and {1} respectively'.format(dim, draws_dim))
-      if validate_args:
-        draws_times = tff_utils.get_shape(normal_draws)[0]
-        asserts.append(tf.assert_equal(
-            draws_times, tf.shape(keep_mask)[0] - 1,
-            message='`num_time_steps` should be equal to '
-                    '`tf.shape(normal_draws)[1]`'))
-    if validate_args:
-      with tf.control_dependencies(asserts):
-        times = tf.identity(times)
-    if watch_params is not None:
-      watch_params = [tf.convert_to_tensor(param, dtype=dtype)
-                      for param in watch_params]
+        normal_draws = jnp.asarray(normal_draws, dtype=dtype)
+        # Shape [num_time_points] + batch_shape + [num_samples, dim]
+        # normal_draws_rank = normal_draws.shape.rank
+        # perm = tf.concat(
+        #     [[normal_draws_rank-2], tf.range(normal_draws_rank-2),
+        #     [normal_draws_rank-1]], axis=0)
+        # normal_draws = tf.transpose(normal_draws, perm=perm)
+        # num_samples = tf.shape(normal_draws)[-2]
+        # draws_dim = normal_draws.shape[-1]
+        # if dim != draws_dim:
+        #     raise ValueError(
+        #         '`dim` should be equal to `normal_draws.shape[2]` but are '
+        #         '{0} and {1} respectively'.format(dim, draws_dim))
+    #   if validate_args:
+    #     draws_times = tff_utils.get_shape(normal_draws)[0]
+    #     asserts.append(tf.assert_equal(
+    #         draws_times, tf.shape(keep_mask)[0] - 1,
+    #         message='`num_time_steps` should be equal to '
+    #                 '`tf.shape(normal_draws)[1]`'))
+    # if validate_args:
+    #   with tf.control_dependencies(asserts):
+    #     times = tf.identity(times)
+    # if watch_params is not None:
+    #   watch_params = [tf.convert_to_tensor(param, dtype=dtype)
+    #                   for param in watch_params]
     return _sample(
         dim=dim,
         batch_shape=batch_shape,
@@ -300,10 +302,136 @@ def sample(
         initial_state=initial_state,
         random_type=random_type,
         seed=seed,
-        swap_memory=swap_memory,
-        skip=skip,
         precompute_normal_draws=precompute_normal_draws,
         normal_draws=normal_draws,
-        watch_params=watch_params,
         time_indices=time_indices,
         dtype=dtype)
+
+
+def _sample(*,
+            dim,
+            batch_shape,
+            drift_fn,
+            volatility_fn,
+            times,
+            keep_mask,
+            num_requested_times,
+            num_samples,
+            initial_state,
+            random_type,
+            seed, swap_memory,
+            skip,
+            precompute_normal_draws,
+            loop_method,
+            time_indices,
+            normal_draws,
+            dtype):
+    """Returns a sample of paths from the process using Euler method."""
+    dt = times[1:] - times[:-1]
+    sqrt_dt = jnp.sqrt(dt)
+    # current_state.shape = batch_shape + [num_samples, dim]
+    current_state = initial_state + jnp.zeros([num_samples, dim], dtype=dtype)
+    steps_num = dt.shape[-1]
+    wiener_mean = None
+    if normal_draws is None:
+        pass
+    # In order to use low-discrepancy random_type we need to generate the
+    # sequence of independent random normals upfront. We also precompute random
+    # numbers for stateless random type in order to ensure independent samples
+    # for multiple function calls with different seeds.
+    # if precompute_normal_draws or random_type in (
+    #     random.RandomType.SOBOL,
+    #     random.RandomType.HALTON,
+    #     random.RandomType.HALTON_RANDOMIZED,
+    #     random.RandomType.STATELESS,
+    #     random.RandomType.STATELESS_ANTITHETIC):
+    #   normal_draws = utils.generate_mc_normal_draws(
+    #       num_normal_draws=dim, num_time_steps=steps_num,
+    #       num_sample_paths=num_samples, batch_shape=batch_shape,
+    #       random_type=random_type, dtype=dtype, seed=seed, skip=skip)
+    #   wiener_mean = None
+    else:
+        # If pseudo or anthithetic sampling is used, proceed with random sampling
+        # at each step.
+        wiener_mean = jnp.zeros((dim,), dtype=dtype)
+        normal_draws = None
+    if loop_method == 'while':
+        return _while_loop(
+            steps_num=steps_num,
+            current_state=current_state,
+            drift_fn=drift_fn, volatility_fn=volatility_fn, wiener_mean=wiener_mean,
+            num_samples=num_samples, times=times,
+            dt=dt, sqrt_dt=sqrt_dt, keep_mask=keep_mask,
+            num_requested_times=num_requested_times,
+            swap_memory=swap_memory,
+            random_type=random_type, seed=seed, normal_draws=normal_draws,
+            dtype=dtype)
+    # else:
+    #     # Use custom for_loop if `watch_params` is specified
+    #     return _for_loop(
+    #         batch_shape=batch_shape, steps_num=steps_num,
+    #         current_state=current_state,
+    #         drift_fn=drift_fn, volatility_fn=volatility_fn, wiener_mean=wiener_mean,
+    #         num_samples=num_samples, times=times,
+    #         dt=dt, sqrt_dt=sqrt_dt, time_indices=time_indices,
+    #         keep_mask=keep_mask, watch_params=watch_params,
+    #         random_type=random_type, seed=seed, normal_draws=normal_draws)
+
+
+def _while_loop(*, steps_num, current_state,
+                drift_fn, volatility_fn, wiener_mean,
+                num_samples, times, dt, sqrt_dt, num_requested_times,
+                keep_mask, random_type, seed, normal_draws, dtype):
+    """Sample paths using tf.while_loop."""
+    written_count = 0
+    if isinstance(num_requested_times, int) and num_requested_times == 1:
+        record_samples = False
+        result = current_state
+    else:
+        # If more than one sample has to be recorded, create a ndarray
+        record_samples = True
+        element_shape = current_state.shape
+        result = jnp.zeros((num_requested_times, ) + element_shape, dtype=dtype)
+        # Include initial state, if necessary
+        result = result.at[written_count].set(current_state)
+    written_count = lax.add(written_count, keep_mask[0])
+    
+    # Define sampling while_loop body function
+    def cond_fn(i, written_count, *args):
+        # It can happen that `times_grid[-1] > times[-1]` in which case we have
+        # to terminate when `written_count` reaches `num_requested_times`
+        del args
+        return jnp.logical_and(i < steps_num, written_count < num_requested_times)
+
+  def step_fn(i, written_count, current_state, result):
+    return _euler_step(
+        i=i,
+        written_count=written_count,
+        current_state=current_state,
+        result=result,
+        drift_fn=drift_fn,
+        volatility_fn=volatility_fn,
+        wiener_mean=wiener_mean,
+        num_samples=num_samples,
+        times=times,
+        dt=dt,
+        sqrt_dt=sqrt_dt,
+        keep_mask=keep_mask,
+        random_type=random_type,
+        seed=seed,
+        normal_draws=normal_draws,
+        record_samples=record_samples)
+  # Sample paths
+  _, _, _, result = tf.while_loop(
+      cond_fn, step_fn, (0, written_count, current_state, result),
+      maximum_iterations=steps_num,
+      swap_memory=swap_memory)
+  if not record_samples:
+    # shape batch_shape + [num_samples, 1, dim]
+    return tf.expand_dims(result, axis=-2)
+  # Shape [num_time_points] + batch_shape + [num_samples, dim]
+  result = result.stack()
+  # transpose to shape batch_shape + [num_samples, num_time_points, dim]
+  n = result.shape.rank
+  perm = list(range(1, n-1)) + [0, n - 1]
+  return tf.transpose(result, perm)

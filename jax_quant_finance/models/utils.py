@@ -1,6 +1,8 @@
 """Utility methods for model building."""
 import jax.numpy as jnp
 
+from jax_quant_finance.utils import ops
+
 
 def prepare_grid(*, times, time_step, dtype, tolerance=None,
                  num_time_steps=None, times_grid=None):
@@ -64,15 +66,16 @@ def prepare_grid(*, times, time_step, dtype, tolerance=None,
             jnp.abs(times_diff_2) > jnp.abs(times_diff_1),
             time_indices,
             jnp.maximum(time_indices - 1, 0))
+    
     # Create a boolean mask to identify the iterations that have to be recorded.
     # Use `tf.scatter_nd` because it handles duplicates. Also we first create
     # an int64 Tensor and then create a boolean mask because scatter_nd with
     # booleans is currently not supported on GPUs.
-    mask = tf.scatter_nd(
-        indices=tf.expand_dims(tf.cast(time_indices, dtype=tf.int64), axis=1),
-        updates=tf.fill(tf.shape(times), 1),
-        shape=tf.shape(all_times, out_type=tf.int64))
-    mask = tf.where(mask > 0, True, False)
+    mask = ops.scatter_nd(
+        indices=jnp.expand_dims(jnp.asarray(time_indices, dtype=jnp.int64), axis=1),
+        updates=jnp.ones(times.shape),
+        shape=all_times.shape)
+    mask = jnp.where(mask > 0, True, False)
 
     return all_times, mask, time_indices
 
@@ -112,6 +115,6 @@ def _grid_from_num_times(*, times, time_step, num_time_steps):
         jnp.maximum(num_time_steps - times.shape[0], 0))
     grid = jnp.sort(jnp.concatenate([uniform_grid, times], axis=0))
     # Add zero to the time grid
-    all_times = jnp.concat([[0], grid], axis=0)
+    all_times = jnp.concatenate([jnp.asarray([0]), grid], axis=0)
     time_indices = jnp.searchsorted(all_times, times)
     return all_times, time_indices

@@ -7,7 +7,7 @@ config.update("jax_enable_x64", True)
 
 from jax import jit
 from jax import random
-from jax_quant_finance.black_sholes.vanilla_prices import option_price
+from jax_quant_finance.black_scholes.vanilla_prices import option_price
 
 
 def test_option_prices():
