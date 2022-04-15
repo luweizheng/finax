@@ -50,7 +50,6 @@ def test_option_prices_np():
 
 def test_option_prices_list():
     """Tests that the BS prices are correct."""
-    
     forwards = [1.0, 2.0, 3.0, 4.0, 5.0]
     strikes = [3.0, 3.0, 3.0, 3.0, 3.0]
     volatilities = [0.0001, 102.0, 2.0, 0.1, 0.4]
