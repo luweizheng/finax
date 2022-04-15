@@ -167,13 +167,13 @@ def test_price_vol_and_expiry_scaling():
             strikes=strikes,
             expiries=expiries,
             forwards=forwards,
-            dtype=jnp.dtype)
+            dtype=jnp.float64)
     scaled_prices = option_price(
             volatilities=volatilities * scaling,
             strikes=strikes,
             expiries=expiries / scaling / scaling,
             forwards=forwards,
-            dtype=jnp.dtype)
+            dtype=jnp.float64)
     assert jnp.allclose(base_prices, scaled_prices, 1e-10)
 
 def test_option_prices_detailed_discount():
