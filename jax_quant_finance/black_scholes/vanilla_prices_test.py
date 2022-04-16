@@ -1,6 +1,10 @@
+"""Tests for vanilla_price."""
+
+import functools
 import numpy as np
 import jax.numpy as jnp
-from jax import jit
+from jax import jit, jvp
+import jax.scipy.stats as stats
 
 import jax_quant_finance as jqf
 
@@ -161,6 +165,488 @@ class VanillaPrice(jtu.JaxTestCase):
         expected_prices = jnp.array(
             [0.03, 0.57, 3.42, 9.85, 18.62, 20.41, 11.25, 4.40, 1.12, 0.18], dtype)
         self.assertAllClose(expected_prices, computed_prices, atol=5e-3)
+
+    
+    def test_binary_prices(self):
+        """Tests that the BS binary option prices are correct."""
+        forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        strikes = np.array([3.0, 3.0, 3.0, 3.0, 3.0])
+        volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+        expiries = 1.0
+        computed_prices = jqf.black_scholes.binary_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                forwards=forwards)
+        expected_prices = np.array([0.0, 0.0, 0.15865525, 0.99764937, 0.85927418])
+        self.assertAllClose(expected_prices, computed_prices, atol=1e-8)
+
+
+    def test_binary_prices_bulk(self):
+        """Tests unit of cash binary option pricing over a wide range of settings.
+
+        Uses the fact that if the underlying follows a geometric brownian motion
+        then, given the mean on the exponential scale and the variance on the log
+        scale, the mean on the log scale is known. In particular for underlying S
+        with forward price F, strike K, volatility sig, and expiry T:
+
+        log(S) ~ N(log(F) - sig^2 T, sig^2 T)
+
+        The price of the binary call option is the discounted probability that S
+        will be greater than K at expiry (and for a put option, less than K). Since
+        quantiles are preserved under monotonic transformations we can find this
+        probability on the log scale. This provides an alternate calculation for the
+        same price which we can use to corroborate the standard method.
+        """
+        np.random.seed(321)
+        num_examples = 1000
+        forwards = np.exp(np.random.normal(size=num_examples))
+        strikes = np.exp(np.random.normal(size=num_examples))
+        volatilities = np.exp(np.random.normal(size=num_examples))
+        expiries = np.random.gamma(shape=1.0, scale=1.0, size=num_examples)
+        log_scale = np.sqrt(expiries) * volatilities
+        log_loc = np.log(forwards) - 0.5 * log_scale**2
+        call_options = np.random.binomial(n=1, p=0.5, size=num_examples)
+        discount_factors = np.random.beta(a=1.0, b=1.0, size=num_examples)
+
+        cdf_values = stats.norm.cdf(x=np.log(strikes), loc=log_loc, scale=log_scale)
+
+        expected_prices = discount_factors * (
+            call_options + ((-1.0)**call_options) * cdf_values)
+
+        is_call_options = np.array(call_options, dtype=np.bool)
+        computed_prices = jqf.black_scholes.binary_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                forwards=forwards,
+                is_call_options=is_call_options,
+                discount_factors=discount_factors)
+        self.assertAllClose(expected_prices, computed_prices, atol=1e-10)
+
+    def test_binary_vanilla_call_consistency(self):
+        r"""Tests code consistency through relationship of binary and vanilla prices.
+
+        With forward F, strike K, discount rate r, and expiry T, a vanilla call
+        option should have price CV:
+
+        $$ VC(K) = e^{-rT}( N(d_1)F - N(d_2)K ) $$
+
+        A unit of cash paying binary call option should have price BC:
+
+        $$ BC(K) = e^{-rT} N(d_2) $$
+
+        Where d_1 and d_2 are standard Black-Scholes quanitities and depend on K
+        through the ratio F/K. Hence for a small increment e:
+
+        $$ (VC(K + e) - Vc(K))/e \approx -N(d_2)e^{-rT} = -BC(K + e) $$
+
+        Similarly, for a vanilla put:
+
+        $$ (VP(K + e) - VP(K))/e \approx N(-d_2)e^{-rT} = BP(K + e) $$
+
+        This enables a test for consistency of pricing between vanilla and binary
+        options prices.
+        """
+        np.random.seed(135)
+        num_examples = 1000
+        forwards = np.exp(np.random.normal(size=num_examples))
+        strikes_0 = np.exp(np.random.normal(size=num_examples))
+        epsilon = 1e-8
+        strikes_1 = strikes_0 + epsilon
+        volatilities = np.exp(np.random.normal(size=num_examples))
+        expiries = np.random.gamma(shape=1.0, scale=1.0, size=num_examples)
+        call_options = np.random.binomial(n=1, p=0.5, size=num_examples)
+        is_call_options = np.array(call_options, dtype=np.bool)
+        discount_factors = np.ones_like(forwards)
+
+        option_prices_0 = jqf.black_scholes.option_price(
+                volatilities=volatilities,
+                strikes=strikes_0,
+                expiries=expiries,
+                forwards=forwards,
+                is_call_options=is_call_options)
+
+        option_prices_1 = jqf.black_scholes.option_price(
+                volatilities=volatilities,
+                strikes=strikes_1,
+                expiries=expiries,
+                forwards=forwards,
+                is_call_options=is_call_options)
+
+        binary_approximation = (-1.0)**call_options * (option_prices_1 -
+                                                    option_prices_0) / epsilon
+
+        binary_prices = jqf.black_scholes.binary_price(
+                volatilities=volatilities,
+                strikes=strikes_1,
+                expiries=expiries,
+                forwards=forwards,
+                is_call_options=is_call_options,
+                discount_factors=discount_factors)
+
+        self.assertAllClose(binary_approximation, binary_prices, atol=1e-6)
+
+    def test_binary_vanilla_consistency_exact(self):
+        """Tests that the binary price is the negative gradient of vanilla price."""
+
+        # The binary call option payoff is 1 when spot > strike and 0 otherwise.
+        # This payoff is the proportional to the gradient of the payoff of a vanilla
+        # call option (max(S-K, 0)) with respect to K. This test verifies that this
+        # relationship is satisfied. A similar relation holds true between vanilla
+        # puts and binary puts.
+        dtype = jnp.float64
+        strikes = jnp.asarray([1.0, 2.0], dtype=dtype)
+        spots = jnp.asarray([1.5, 1.5], dtype=dtype)
+        expiries = jnp.asarray([2.1, 1.3], dtype=dtype)
+        discount_rates = jnp.asarray([0.03, 0.04], dtype=dtype)
+        discount_factors = jnp.exp(-discount_rates * expiries)
+        is_call_options = jnp.asarray([True, False])
+        volatilities = jnp.asarray([0.3, 0.4], dtype=dtype)
+        actual_binary_price = jqf.black_scholes.binary_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                spots=spots,
+                discount_factors=discount_factors,
+                is_call_options=is_call_options)
+        price_fn = functools.partial(
+            jqf.black_scholes.option_price,
+            volatilities=volatilities,
+            spots=spots,
+            expiries=expiries,
+            discount_rates=discount_rates,
+            is_call_options=is_call_options)
+        _, implied_binary_price = jvp(lambda x: price_fn(strikes=x), (strikes, ), (jnp.ones_like(strikes), ))
+        implied_binary_price = jnp.where(is_call_options, -implied_binary_price, implied_binary_price)
+        self.assertAllClose(implied_binary_price, actual_binary_price, atol=1e-10)
+
+    def test_asset_or_nothing_prices(self):
+        """Tests that the BS asset-or-nothing option prices are correct."""
+        forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        strikes = np.array([3.0, 3.0, 3.0, 3.0, 3.0])
+        volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+        expiries = 1.0
+        computed_prices = jqf.black_scholes.asset_or_nothing_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                forwards=forwards)
+        expected_prices = np.array([0., 2., 2.52403424, 3.99315108, 4.65085383])
+
+        self.assertAllClose(expected_prices, computed_prices, atol=1e-8)
+
+        is_call_options = True
+        vanilla_prices = jqf.black_scholes.option_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                forwards=forwards,
+                is_call_options=is_call_options,
+            )
+        cash_or_nothing_prices = strikes * jqf.black_scholes.binary_price(
+                                                volatilities=volatilities,
+                                                strikes=strikes,
+                                                expiries=expiries,
+                                                forwards=forwards,
+                                                is_call_options=is_call_options,
+                                            )
+        asset_or_nothing_prices = jqf.black_scholes.asset_or_nothing_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                forwards=forwards,
+                is_call_options=is_call_options,
+            )
+
+        self.assertAllClose(vanilla_prices,
+                            asset_or_nothing_prices - cash_or_nothing_prices,
+                            atol=1e-10)
+
+    
+    @parameterized.product(
+      discount_mode=('rates', 'factors'),
+      is_normal=(True, False),
+    )
+    def test_vanilla_and_binary_prices_consistency_bulk(self, discount_mode, is_normal):
+        """Tests the consistency between vanilla and binary option prices."""
+
+        # A vanilla call is equivalent to the combination of a long asset-or-nothing
+        # call and short {strike} units of cash-or-nothing calls.
+        # A vanilla put is equivalent to the combination of a long {strike} units of
+        # cash-or-nothing puts and an short asset-or-nothing put.
+        # This test confirms that the computed vanilla and binary option prices are
+        # consistent with the above relations for a range of simulated settings.
+
+        np.random.seed(321)
+        num_examples = 1000
+        volatilities = np.exp(np.random.normal(size=num_examples))
+        strikes = np.exp(np.random.normal(size=num_examples))
+        expiries = np.random.gamma(shape=1.0, scale=1.0, size=num_examples)
+        forwards = np.exp(np.random.normal(size=num_examples))
+        if discount_mode == 'rates':
+            discount_rates = np.random.uniform(0.0, 0.05, size=num_examples)
+            discount_factors = None
+        else:
+            discount_factors = np.random.beta(a=1.0, b=1.0, size=num_examples)
+            discount_rates = None
+        dividend_rates = np.random.uniform(0.0, 0.05, size=num_examples)
+        call_options = np.random.binomial(n=1, p=0.5, size=num_examples)
+        is_call_options = np.array(call_options, dtype=np.bool)
+
+        asset_or_nothing_prices = jqf.black_scholes.asset_or_nothing_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards,
+            discount_rates=discount_rates,
+            dividend_rates=dividend_rates,
+            is_call_options=is_call_options,
+            is_normal_volatility=is_normal,
+            discount_factors=discount_factors)
+        cash_or_nothing_prices = jqf.black_scholes.binary_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards,
+            discount_rates=discount_rates,
+            dividend_rates=dividend_rates,
+            is_call_options=is_call_options,
+            is_normal_volatility=is_normal,
+            discount_factors=discount_factors)
+        synthetic_vanilla_from_binary_prices = jnp.where(
+            is_call_options,
+            asset_or_nothing_prices - strikes * cash_or_nothing_prices,
+            strikes * cash_or_nothing_prices - asset_or_nothing_prices)
+
+        directly_computed_vanilla_prices = jqf.black_scholes.option_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            forwards=forwards,
+            discount_rates=discount_rates,
+            dividend_rates=dividend_rates,
+            is_call_options=is_call_options,
+            is_normal_volatility=is_normal,
+            discount_factors=discount_factors)
+
+        # TODO in TFF, atol is 1e-10
+        self.assertAllClose(synthetic_vanilla_from_binary_prices,
+            directly_computed_vanilla_prices, atol=1e-8)
+    
+    # TODO what's gradient tape
+    # @parameterized.product(
+    # (
+    #         {
+    #             'vol': 0.25,
+    #             'strikes': 90.0,
+    #             'expiries': 0.5,
+    #             'forwards': 100.0
+    #         },
+    #         {
+    #             'vol': 0.25,
+    #             'strikes': 90.0,
+    #             'expiries': 0.0,  # Differentiable even at 0.0 expiry.
+    #             'forwards': 100.0
+    #         },
+    #         {
+    #             'vol': 0.25,
+    #             'strikes': 90.0,
+    #             'expiries': 0.5,
+    #             'forwards': 90.0  # Differentiable at the money.
+    #         },
+    #     ),
+    #     is_call=(True, False),
+    #     is_normal=(True, False),
+    # )
+    # def test_vanilla_options_price_gradient_continuous(self, vol, strikes,
+    #                                                     expiries, forwards,
+    #                                                     is_call, is_normal):
+    #     """Tests that the gradient exists, and is also right-continuous."""
+    #     dtype = tf.float64
+    #     vol = tf.convert_to_tensor(vol, dtype=dtype)
+    #     strikes = tf.convert_to_tensor(strikes, dtype=dtype)
+    #     expiries = tf.convert_to_tensor(expiries, dtype=dtype)
+    #     forwards = tf.convert_to_tensor(forwards, dtype=dtype)
+
+    #     with tf.GradientTape(persistent=True) as tape:
+    #     tape.watch([vol, strikes, expiries, forwards])
+    #     price = tff.black_scholes.option_price(
+    #         volatilities=vol,
+    #         strikes=strikes,
+    #         expiries=expiries,
+    #         forwards=forwards,
+    #         is_call_options=is_call,
+    #         is_normal_volatility=is_normal,
+    #         dtype=dtype)
+    #     grad = tape.gradient(
+    #         target=price, sources=[vol, strikes, expiries, forwards])
+
+    #     grad = self.evaluate(grad)
+    #     self.assertTrue(all(np.all(np.isfinite(x)) for x in grad))
+
+    #     with tf.GradientTape(persistent=True) as tape:
+    #     tape.watch([vol, strikes, expiries, forwards])
+    #     price_perturb_vol = tff.black_scholes.option_price(
+    #         volatilities=vol + 1e-6,
+    #         strikes=strikes,
+    #         expiries=expiries,
+    #         forwards=forwards,
+    #         is_call_options=is_call,
+    #         is_normal_volatility=is_normal,
+    #         dtype=dtype)
+    #     grad_perturb_vol = tape.gradient(
+    #         target=price_perturb_vol, sources=[vol, strikes, expiries, forwards])
+
+    #     grad_perturb_vol = self.evaluate(grad_perturb_vol)
+    #     self.assertAllClose(grad, grad_perturb_vol, rtol=1e-4)
+
+    #     with tf.GradientTape(persistent=True) as tape:
+    #     tape.watch([vol, strikes, expiries, forwards])
+    #     price_perturb_expiries = tff.black_scholes.option_price(
+    #         volatilities=vol,
+    #         strikes=strikes,
+    #         expiries=expiries + 1e-6,
+    #         forwards=forwards,
+    #         is_call_options=is_call,
+    #         is_normal_volatility=is_normal,
+    #         dtype=dtype)
+    #     grad_perturb_expiries = tape.gradient(
+    #         target=price_perturb_expiries,
+    #         sources=[vol, strikes, expiries, forwards])
+
+    #     grad_perturb_expiries = self.evaluate(grad_perturb_expiries)
+    #     self.assertAllClose(grad, grad_perturb_expiries, rtol=1e-4)
+
+    # with tf.GradientTape(persistent=True) as tape:
+    #   tape.watch([vol, strikes, expiries, forwards])
+    #   price_perturb_strikes = tff.black_scholes.option_price(
+    #       volatilities=vol,
+    #       strikes=strikes + 1e-6,
+    #       expiries=expiries,
+    #       forwards=forwards,
+    #       is_call_options=is_call,
+    #       is_normal_volatility=is_normal,
+    #       dtype=dtype)
+    #   grad_perturb_strikes = tape.gradient(
+    #       target=price_perturb_strikes,
+    #       sources=[vol, strikes, expiries, forwards])
+
+    # grad_perturb_strikes = self.evaluate(grad_perturb_strikes)
+    # self.assertAllClose(grad, grad_perturb_strikes, rtol=1e-4)
+
+    # TODO VectorInputs/MatrixInputs is wrong, maybe there is some bug in barrier_option
+    @parameterized.named_parameters(
+    {
+        'testcase_name': 'ScalarInputsUIP',
+        'volatilities': 0.25,
+        'strikes': 90.0,
+        'expiries': 0.5,
+        'spots': 100.0,
+        'discount_rates': 0.08,
+        'dividend_rates': 0.04,
+        'barriers': 105.0,
+        'rebates': 3.0,
+        'is_barrier_down': False,
+        'is_knock_out': False,
+        'is_call_options': False,
+        'expected_price': 1.4653,
+    }, {
+        'testcase_name': 'ScalarInputsUIP_Default_Values',
+        'volatilities': 0.30,
+        'strikes': 105.0,
+        'expiries': 10.0,
+        'spots': 100.0,
+        'discount_rates': None,
+        'dividend_rates': None,
+        'barriers': 90.0,
+        'rebates': None,
+        'is_barrier_down': True,
+        'is_knock_out': True,
+        'is_call_options': True,
+        'expected_price': 9.2848,
+    }, {
+        'testcase_name':
+            'VectorInputs',
+        'volatilities': [.25, .25, .25, .25, .25, .25, .25, .25],
+        'strikes': [90., 90., 90., 90., 90., 90., 90., 90.],
+        'expiries': [.5, .5, .5, .5, .5, .5, .5, .5],
+        'spots': [100., 100., 100., 100., 100., 100., 100., 100.],
+        'discount_rates': [.08, .08, .08, .08, .08, .08, .08, .08],
+        'dividend_rates': [.04, .04, .04, .04, .04, .04, .04, .04],
+        'barriers': [95., 95., 105., 105., 95., 105., 95., 105.],
+        'rebates': [3., 3., 3., 3., 3., 3., 3., 3.],
+        'is_barrier_down':
+            [True, True, False, False, True, False, True, False],
+        'is_knock_out': [True, False, True, False, True, True, False, False],
+        'is_call_options':
+            [True, True, True, True, False, False, False, False],
+        'expected_price':
+            [9.024, 7.7627, 2.6789, 14.1112, 2.2798, 3.7760, 2.95586, 1.4653],
+    }, {
+        'testcase_name':
+            'MatrixInputs',
+        'volatilities': [[.25, .25], [.25, .25], [.25, .25], [.25, .25]],
+        'strikes': [[90., 90.], [90., 90.], [90., 90.], [90., 90.]],
+        'expiries': [[.5, .5], [.5, .5], [.5, .5], [.5, .5]],
+        'spots': [[100., 100.], [100., 100.], [100., 100.], [100., 100.]],
+        'discount_rates': [[.08, .08], [.08, .08], [.08, .08], [.08, .08]],
+        'dividend_rates': [[.04, .04], [.04, .04], [.04, .04], [.04, .04]],
+        'barriers': [[95., 95.], [105., 105.], [95., 105.], [95., 105.]],
+        'rebates': [[3., 3.], [3., 3.], [3., 3.], [3., 3.]],
+        'is_barrier_down': [[True, True], [False, False], [True, False],
+                            [True, False]],
+        'is_knock_out': [[True, False], [True, False], [True, True],
+                        [False, False]],
+        'is_call_options': [[True, True], [True, True], [False, False],
+                            [False, False]],
+        'expected_price': [[9.024, 7.7627], [2.6789, 14.1112],
+                            [2.2798, 3.7760], [2.95586, 1.4653]],
+    }, {
+        'testcase_name': 'dividend_rates',
+        'volatilities': 0.25,
+        'strikes': 90.0,
+        'expiries': 0.5,
+        'spots': 100.0,
+        'discount_rates': 0.08,
+        'dividend_rates': 0.04,
+        'barriers': 105.0,
+        'rebates': 3.0,
+        'is_barrier_down': False,
+        'is_knock_out': False,
+        'is_call_options': False,
+        'expected_price': 1.4653,
+    })
+    def test_barrier_option(self,
+                            *,
+                            volatilities,
+                            strikes,
+                            expiries,
+                            spots,
+                            discount_rates,
+                            barriers,
+                            rebates,
+                            is_barrier_down,
+                            is_knock_out,
+                            is_call_options,
+                            expected_price,
+                            dividend_rates=None):
+        """Computes test barrier option prices for the parameterized inputs."""
+        # The input values are from examples in the following textbook:
+        # The Complete guide to Option Pricing Formulas, 2nd Edition, Page 154
+        price = jqf.black_scholes.barrier_price(
+            volatilities=volatilities,
+            strikes=strikes,
+            expiries=expiries,
+            spots=spots,
+            discount_rates=discount_rates,
+            dividend_rates=dividend_rates,
+            barriers=barriers,
+            rebates=rebates,
+            is_barrier_down=is_barrier_down,
+            is_knock_out=is_knock_out,
+            is_call_options=is_call_options)
+        self.assertAllClose(price, jnp.asarray(expected_price), rtol=10e-3)
 
 
     @parameterized.named_parameters(

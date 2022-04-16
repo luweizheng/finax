@@ -297,15 +297,13 @@ def barrier_price(*,
     if rebates is not None:
         rebates = jnp.asarray(rebates, dtype=dtype)
     else:
-        rebates = jnp.asarray(0.0, dtype=dtype)
+        rebates = jnp.zeros_like(spots, dtype=dtype)
 
     # Convert all to tensor and enforce float dtype where required
     if discount_rates is not None:
-        discount_rates = jnp.asarray(
-            discount_rates, dtype=dtype)
+        discount_rates = jnp.asarray(discount_rates, dtype=dtype)
     else:
-        discount_rates = jnp.asarray(
-            0.0, dtype=dtype)
+        discount_rates = jnp.asarray(0.0, dtype=dtype)
 
     if dividend_rates is not None:
         dividend_rates = jnp.asarray(dividend_rates, dtype=dtype)
@@ -313,25 +311,24 @@ def barrier_price(*,
         dividend_rates = jnp.asarray(0.0, dtype=dtype)
     
     if is_barrier_down is None:
-        is_barrier_down = jnp.bool_(True)
+        is_barrier_down = jnp.asarray(1)
     else:
-        is_barrier_down = jnp.asarray(is_barrier_down, dtype=dtype)
+        is_barrier_down = jnp.asarray(is_barrier_down, dtype=jnp.bool_)
         is_barrier_down = jnp.where(is_barrier_down, 1, 0)
     if is_knock_out is None:
-        is_knock_out = jnp.bool_(True)
+        is_knock_out = jnp.asarray(1)
     else:
-        is_knock_out = jnp.asarray(is_knock_out, dtype=dtype)
+        is_knock_out = jnp.asarray(is_knock_out, dtype=jnp.bool_)
         is_knock_out = jnp.where(is_knock_out, 1, 0)
     if is_call_options is None:
-        is_call_options = jnp.bool_(True)
+        is_call_options = jnp.asarray(1)
     else:
-        is_call_options = jnp.asarray(is_call_options, dtype=dtype)
+        is_call_options = jnp.asarray(is_call_options, dtype=jnp.bool_)
         is_call_options = jnp.where(is_call_options, 1, 0)
 
     
     # Indices which range from 0-7 are used to select the appropriate
     # mask for each barrier
-        
     indices = jnp.left_shift(is_barrier_down, 2) + jnp.left_shift(
             is_knock_out, 1) + is_call_options
     #indices = jnp.multiply(is_barrier_down, 4) + jnp.multiply(is_knock_out, 2) + is_call_options 
@@ -342,7 +339,7 @@ def barrier_price(*,
     # distribution terms. This give 12 different terms per matrix
     # (6 integrals, 2 terms each)
     # shape = [8, 12]
-    mask_matrix_greater_strike = jnp.asarray([ #jax中constant接口
+    mask_matrix_greater_strike = jnp.asarray([
         [1, 1, -1, -1, 0, 0, 1, 1, 1, 1, 0, 0],  # up and in put
         [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0],  # up and in call
         [0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1, 1],  # up and out put
@@ -350,7 +347,7 @@ def barrier_price(*,
         [0, 0, 1, 1, -1, -1, 1, 1, 0, 0, 1, 1],  # down and in put
         [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0],  # down and in call
         [1, 1, -1, -1, 1, 1, -1, -1, 0, 0, 1, 1],  # down and out put
-        [1, 1, 0, 0, -1, -1, 0, 0, 0, 0, 1, 1]], dtype=jnp.int32)  # down and out call
+        [1, 1, 0, 0, -1, -1, 0, 0, 0, 0, 1, 1]])  # down and out call
 
     mask_matrix_lower_strike = jnp.asarray([
         [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0],  # up and in put
@@ -360,7 +357,7 @@ def barrier_price(*,
         [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0],  # down and in put
         [1, 1, -1, -1, 0, 0, 1, 1, 1, 1, 0, 0],  # down and in call
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],  # down and out put
-        [0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1, 1]], dtype=jnp.int32)  # down and out call
+        [0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1, 1]])  # down and out call
 
     # Create masks
     # Masks are shape [strikes.shape, 12]
@@ -370,9 +367,9 @@ def barrier_price(*,
     masks = jnp.where(strikes_greater, masks_greater, masks_lower)
     masks = jnp.asarray(masks, dtype=dtype)
     one = jnp.asarray(1, dtype=jnp.int32)
-    call_or_put = jnp.asarray(jnp.where(jnp.allclose(jnp.asarray(is_call_options), 0), -one, one),
+    call_or_put = jnp.asarray(jnp.where(jnp.equal(is_call_options, 0), -one, one),
                             dtype=dtype)
-    below_or_above = jnp.asarray(jnp.where(jnp.allclose(jnp.asarray(is_barrier_down), 0), -one, one),
+    below_or_above = jnp.asarray(jnp.where(jnp.equal(is_barrier_down, 0), -one, one),
                             dtype=dtype)
 
     
@@ -576,7 +573,7 @@ def binary_price(*,
     zero_volatility_call_payoff = jnp.where(forwards > strikes,
                                             jnp.ones_like(strikes, dtype=dtype),
                                             jnp.empty_like(strikes, dtype=dtype))
-    undiscounted_calls = jnp.where(sqrt_var > 0, _ncdf(d2), zero_volatility_call_payoff)
+    undiscounted_calls = jnp.where(sqrt_var > 0, ncdf(d2), zero_volatility_call_payoff)
 
     if is_call_options is None:
         return discount_factors * undiscounted_calls
@@ -721,13 +718,13 @@ def asset_or_nothing_price(*,
     if not is_normal_volatility:  # lognormal model
         d1 = divide_no_nan(jnp.log(forwards / strikes),
                                     sqrt_var) + sqrt_var / 2
-        undiscounted_calls = jnp.where(sqrt_var > 0, forwards * _ncdf(d1),
+        undiscounted_calls = jnp.where(sqrt_var > 0, forwards * ncdf(d1),
                                     jnp.where(forwards > strikes, forwards, 0.))
     else:  # normal model
         d1 = divide_no_nan((forwards - strikes), sqrt_var)
         undiscounted_calls = jnp.where(
             sqrt_var > 0.0,
-            forwards * _ncdf(d1) +
+            forwards * ncdf(d1) +
             sqrt_var * jnp.exp(-0.5 * d1**2) / jnp.sqrt(2 * 3.14159265),
             jnp.where(forwards > strikes, forwards, 0.))
 
