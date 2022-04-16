@@ -5,14 +5,11 @@ import numpy as np
 import jax.numpy as jnp
 from jax import jit
 from jax.scipy.stats.norm import cdf as ncdf
+from jax_quant_finance.utils.ops import divide_no_nan
 
 __all__ = [
     'option_price',
 ]
-
-@jit
-def divide_no_nan(x, y):
-  return jnp.where(y != 0, x / y, 0)
 
 # @jit
 # def _ncdf(x, dtype=jnp.float64):

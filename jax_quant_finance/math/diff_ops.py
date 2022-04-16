@@ -1,7 +1,27 @@
 import jax.numpy as jnp
-import numpy as np
 
-def diff(x, order=1, exclusive=False, axis=-1, dtype=None, name=None):
+def diff(x, order=1, exclusive=False, axis=-1, dtype=None):
+    """Computes the difference between elements of an array at a regular interval.
+
+    For a difference along the final axis, if exclusive is True, then computes:
+
+    ```
+        result[..., i] = x[..., i+order] - x[..., i] for i < size(x) - order
+
+    ```
+
+    This is the same as doing `x[..., order:] - x[..., :-order]`. Note that in
+    this case the result `Tensor` is smaller in size than the input `Tensor`.
+
+    If exclusive is False, then computes:
+
+    ```
+        result[..., i] = x[..., i] - x[..., i-order] for i >= order
+        result[..., i] = x[..., i]  for 0 <= i < order
+
+    ```
+    """
+    
     x = jnp.asarray(x, dtype=dtype)
 
     #x0 = x[:-order:1]
@@ -10,10 +30,9 @@ def diff(x, order=1, exclusive=False, axis=-1, dtype=None, name=None):
     x1 = jnp.take(x, indices=jnp.arange(order,x.shape[axis],1), axis=axis)
     exclusive_diff = x1 - x0
     
-    
-    
-
     if exclusive:
         return exclusive_diff
     # slices[axis] = slice(None, order)
-    return jnp.concatenate([jnp.take(x, indices=jnp.arange(0,order,1), axis=axis), exclusive_diff], axis=axis)
+    return jnp.concatenate(
+        [jnp.take(x, indices=jnp.arange(0, order, 1), axis=axis), exclusive_diff], 
+        axis=axis)

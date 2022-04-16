@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 from jax_quant_finance.experimental.rates.analytics import cashflows
-from jax_quant_finance.experimental.math.dividend_no_nan import divide_no_nan
+from jax_quant_finance.utils.ops import divide_no_nan
+# from jax_quant_finance.experimental.math.dividend_no_nan import divide_no_nan
 
 
 def swap_price(pay_leg_cashflows,
@@ -135,10 +136,9 @@ def equity_leg_cashflows(
   dividends = jnp.asarray(dividends, dtype=dtype)
   spots_expand = jnp.expand_dims(spots, axis=-1)
   forward_prices = jnp.concatenate([spots_expand, forward_prices], axis=-1)
-  return divide_no_nan(
-                        notional * (forward_prices[...,1:] - forward_prices[...,:-1])
+  return divide_no_nan(notional * (forward_prices[...,1:] - forward_prices[...,:-1])
                        +dividends,
-                       forward_prices[...,:-1], dtype=dtype)
+                       forward_prices[...,:-1])
 
 
 def rate_leg_cashflows(coupon_rates,notional,daycount_fractions,dtype=None):

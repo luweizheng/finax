@@ -22,7 +22,6 @@ class SwapTest(jtu.JaxTestCase):
           'spots': 100,
           'dividends': [1, 1, 1],
           'expected_pv': [1000.01, 909.1, 1666.675],
-
       }, {
           'testcase_name': 'WithBatch',
           'notional': 10000,
@@ -30,7 +29,6 @@ class SwapTest(jtu.JaxTestCase):
           'spots': [100, 200],
           'dividends': [[1, 1, 1], [2, 2, 2]],
           'expected_pv': [[1000.01, 909.1, 1666.675], [500.01, 476.2, 909.1]],
-
       })
   def test_equity_leg_cashflows(
       self, notional, forward_prices, spots, dividends, expected_pv):
