@@ -2,9 +2,9 @@
 from typing import Union, List
 
 import numpy as np
-import jax
 import jax.numpy as jnp
 from jax import jit
+from jax.scipy.stats.norm import cdf as ncdf
 
 __all__ = [
     'option_price',
@@ -14,12 +14,11 @@ __all__ = [
 def divide_no_nan(x, y):
   return jnp.where(y != 0, x / y, 0)
 
-
-_SQRT_2 = np.sqrt(2.0, dtype=np.float64)
-
-@jit
-def _ncdf(x):
-  return (jax.lax.erf(x / _SQRT_2) + 1) / 2
+# @jit
+# def _ncdf(x, dtype=jnp.float64):
+#     _TWO = jnp.asarray(2, dtype)
+#     _SQRT_2 = jnp.sqrt(_TWO)
+#     return (jax.lax.erf(x / _SQRT_2) + 1) / 2
     
 def option_price(*,
                  volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
@@ -156,13 +155,13 @@ def option_price(*,
         d1 = divide_no_nan(jnp.log(forwards / strikes), sqrt_var) + sqrt_var / 2
         d2 = d1 - sqrt_var
         undiscounted_calls = jnp.where(sqrt_var > 0,
-                                    forwards * _ncdf(d1) - strikes * _ncdf(d2),
+                                    forwards * ncdf(d1) - strikes * ncdf(d2),
                                     jnp.maximum(forwards - strikes, 0.0))
       # normal model
     else:
         d1 = divide_no_nan((forwards - strikes), sqrt_var)
         undiscounted_calls = jnp.where(
-            sqrt_var > 0.0, (forwards - strikes) * _ncdf(d1) +
+            sqrt_var > 0.0, (forwards - strikes) * ncdf(d1) +
             sqrt_var * jnp.exp(-0.5 * d1**2) / np.sqrt(2 * np.pi),
             jnp.maximum(forwards - strikes, 0.0))
 
@@ -289,6 +288,7 @@ def barrier_price(*,
     # row in the matricies coupled with the masks work to calculate the prices of
     # the barriers option.
     dtype = dtype or jnp.float64
+
     spots = jnp.asarray(spots, dtype=dtype)
     strikes = jnp.asarray(strikes, dtype=dtype)
     volatilities = jnp.asarray(volatilities, dtype=dtype)
@@ -320,12 +320,12 @@ def barrier_price(*,
     if is_knock_out is None:
         is_knock_out = jnp.bool_(True)
     else:
-        is_knock_out = jnp.asarray(is_knock_out, dtype=jnp.dtype)
+        is_knock_out = jnp.asarray(is_knock_out, dtype=dtype)
         is_knock_out = jnp.where(is_knock_out, 1, 0)
     if is_call_options is None:
         is_call_options = jnp.bool_(True)
     else:
-        is_call_options = jnp.asarray(is_call_options, dtype=jnp.dtype)
+        is_call_options = jnp.asarray(is_call_options, dtype=dtype)
         is_call_options = jnp.where(is_call_options, 1, 0)
 
     
@@ -333,7 +333,7 @@ def barrier_price(*,
     # mask for each barrier
         
     indices = jnp.left_shift(is_barrier_down, 2) + jnp.left_shift(
-            is_knock_out, 1) + is_call_options #将此处变为乘积
+            is_knock_out, 1) + is_call_options
     #indices = jnp.multiply(is_barrier_down, 4) + jnp.multiply(is_knock_out, 2) + is_call_options 
 
 
@@ -350,7 +350,7 @@ def barrier_price(*,
         [0, 0, 1, 1, -1, -1, 1, 1, 0, 0, 1, 1],  # down and in put
         [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0],  # down and in call
         [1, 1, -1, -1, 1, 1, -1, -1, 0, 0, 1, 1],  # down and out put
-        [1, 1, 0, 0, -1, -1, 0, 0, 0, 0, 1, 1]],dtype=jnp.int32)  # down and out call
+        [1, 1, 0, 0, -1, -1, 0, 0, 0, 0, 1, 1]], dtype=jnp.int32)  # down and out call
 
     mask_matrix_lower_strike = jnp.asarray([
         [0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0],  # up and in put
@@ -360,20 +360,20 @@ def barrier_price(*,
         [1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0],  # down and in put
         [1, 1, -1, -1, 0, 0, 1, 1, 1, 1, 0, 0],  # down and in call
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],  # down and out put
-        [0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1, 1]],dtype=jnp.int32)  # down and out call
+        [0, 0, 1, 1, 0, 0, -1, -1, 0, 0, 1, 1]], dtype=jnp.int32)  # down and out call
 
     # Create masks
     # Masks are shape [strikes.shape, 12]
-    masks_lower = mask_matrix_lower_strike[indices,:] #gather API
+    masks_lower = mask_matrix_lower_strike[indices,:]
     masks_greater = mask_matrix_greater_strike[indices,:]
-    strikes_greater = jnp.expand_dims(strikes > barriers, axis=-1) #expand_dim API
+    strikes_greater = jnp.expand_dims(strikes > barriers, axis=-1)
     masks = jnp.where(strikes_greater, masks_greater, masks_lower)
     masks = jnp.asarray(masks, dtype=dtype)
-    one = jnp.constant(1, dtype=jnp.int32)
+    one = jnp.asarray(1, dtype=jnp.int32)
     call_or_put = jnp.asarray(jnp.where(jnp.allclose(jnp.asarray(is_call_options), 0), -one, one),
-                            dtype=jnp.float64)
+                            dtype=dtype)
     below_or_above = jnp.asarray(jnp.where(jnp.allclose(jnp.asarray(is_barrier_down), 0), -one, one),
-                            dtype=jnp.float64)
+                            dtype=dtype)
 
     
     # Calculate params for integrals
@@ -390,14 +390,13 @@ def barrier_price(*,
     a = mu / (volatilities**2)
 
     # Other params used for integrals
-    discount_factors = jnp.exp(
-        -discount_rates * expiries, name='discount_factors')
-    barriers_ratio = jnp.divide(barriers, spots, name='barriers_ratio')
+    discount_factors = jnp.exp(-discount_rates * expiries)
+    barriers_ratio = jnp.divide(barriers, spots)
     spots_term = call_or_put * spots * jnp.exp(-dividend_rates * expiries)
     strikes_term = call_or_put * strikes * discount_factors
 
     # rank is used to stack elements and reduce_sum
-    strike_rank = strikes.shape.rank
+    strike_rank = len(strikes.shape)
 
     # Constructing Matrix with first and second algebraic terms for each
     # integral [strike.shape, 12]
@@ -409,7 +408,7 @@ def barrier_price(*,
             spots_term * (barriers_ratio**(2 * lamda)),
             -strikes_term * (barriers_ratio**((2 * lamda) - 2)),
             rebates * discount_factors,
-            -rebates * discount_factors * (  # pylint: disable=invalid-unary-operand-type
+            -rebates * discount_factors * (
                 barriers_ratio**((2 * lamda) - 2)),
             rebates * (barriers_ratio**(a + b)),
             rebates * (barriers_ratio**(a - b))),
@@ -431,7 +430,7 @@ def barrier_price(*,
             below_or_above * z,
             below_or_above * (z - (2 * b * sqrt_var))),
             axis=strike_rank)
-    cdf_mat = _ncdf(cdf_mat)
+    cdf_mat = ncdf(cdf_mat)
     # Calculating and returning price for each option
     return jnp.sum(masks * terms_mat * cdf_mat, axis=strike_rank)
 
@@ -577,15 +576,13 @@ def binary_price(*,
     zero_volatility_call_payoff = jnp.where(forwards > strikes,
                                             jnp.ones_like(strikes, dtype=dtype),
                                             jnp.empty_like(strikes, dtype=dtype))
-    undiscounted_calls = jnp.where(sqrt_var > 0, _ncdf(d2),
-                                    zero_volatility_call_payoff)
+    undiscounted_calls = jnp.where(sqrt_var > 0, _ncdf(d2), zero_volatility_call_payoff)
 
     if is_call_options is None:
         return discount_factors * undiscounted_calls
     undiscounted_puts = 1 - undiscounted_calls
     predicate = jnp.broadcast_to(is_call_options, undiscounted_calls.shape)
-    return discount_factors * jnp.where(predicate, undiscounted_calls,
-                                        undiscounted_puts)
+    return discount_factors * jnp.where(predicate, undiscounted_calls, undiscounted_puts)
 
 
 def asset_or_nothing_price(*,
@@ -692,7 +689,6 @@ def asset_or_nothing_price(*,
     if (discount_rates is not None) and (discount_factors is not None):
         raise ValueError('At most one of discount_rates and discount_factors may '
                         'be supplied')
-
 
     dtype = dtype or jnp.float64
     strikes = jnp.asarray(strikes, dtype=dtype)
@@ -874,11 +870,7 @@ def swaption_price(*,
     Returns:
     A `Tensor` of real dtype and shape `batch_shape` containing the
     computed swaption prices.
-    """
-    #del floating_leg_daycount_fractions
-    dtype = dtype or jnp.float64
-    strikes = jnp.asarray(strikes, dtype=dtype)
-    
+    """    
     volatilities = jnp.asarray(volatilities, dtype=dtype)
     expiries = jnp.asarray(expiries, dtype=dtype)
     floating_leg_start_times = jnp.asarray(floating_leg_start_times, dtype=dtype)
