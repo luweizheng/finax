@@ -43,9 +43,13 @@ _ensure_jax_install()
 
 from jax_quant_finance import black_scholes
 from jax_quant_finance import math
-# from jax_quant_finance import models
+from jax_quant_finance import models
 from jax_quant_finance import utils
 from jax_quant_finance import rates
+# from tf_quant_finance import math
+# from tf_quant_finance import models
+# from tf_quant_finance import utils
+
 
 _allowed_symbols = [
     "black_scholes",
