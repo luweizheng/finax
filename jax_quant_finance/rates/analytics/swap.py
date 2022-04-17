@@ -1,7 +1,6 @@
 import jax.numpy as jnp
-from jax_quant_finance.experimental.rates.analytics import cashflows
+from jax_quant_finance.rates.analytics import cashflows
 from jax_quant_finance.utils.ops import divide_no_nan
-# from jax_quant_finance.experimental.math.dividend_no_nan import divide_no_nan
 
 
 def swap_price(pay_leg_cashflows,

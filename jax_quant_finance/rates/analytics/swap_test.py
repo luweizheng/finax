@@ -1,5 +1,4 @@
 import numpy as np
-import jax.numpy as jnp
 import jax_quant_finance as jqf
 
 from jax import config

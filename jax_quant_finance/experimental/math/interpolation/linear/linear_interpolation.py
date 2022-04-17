@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from jax_quant_finance.experimental.utils import shape_utils
+from jax_quant_finance.utils import shape_utils
 
 
 __all__ = [
@@ -49,12 +49,11 @@ def interpolate(x,
         
     control_deps = []
     if validate_args:
+        # TODO : ADD Error Controls
         # Check that `x_data` elements is non-decreasing
         diffs = x_data[..., 1:] - x_data[..., :-1]
         pass
-        """
-        TODO : Add Error Controls
-        """
+
     upper_indices = jnp.searchsorted(x_data, x, side='left')
     upper_indices = jnp.asarray(upper_indices, dtype=jnp.int32)
     x_data_size = shape_utils.get_shape(x_data)[-1]
@@ -72,16 +71,15 @@ def interpolate(x,
     # won't go out of bounds.
     lower_encoding = jnp.maximum(upper_indices - 1 , 0)
     upper_encoding = jnp.minimum(upper_indices, x_data_size - 1)
-    """
-    TODO : optimize for tpu
-    """
+    
+    # TODO : Finish get_slice
+
     def get_slice(x, encoding):
+        # TODO : impl gather func with axis and batch_dims
         if optimize_for_tpu: # not finish
             pass
         return 
-        """
-        TODO : gather with axis and batch_dims 
-        """
+
             
     
     

@@ -1,3 +1,5 @@
+"""Tests for forawds"""
+
 import numpy as np
 import jax.numpy as jnp
 from jax_quant_finance.experimental.rates.analytics.forwards import forward_rates
