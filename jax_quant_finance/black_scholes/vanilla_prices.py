@@ -7,28 +7,28 @@ from jax import jit
 from jax.scipy.stats.norm import cdf as ncdf
 from jax_quant_finance.utils.ops import divide_no_nan
 
+
 __all__ = [
     'option_price',
+    'barrier_price',
+    'binary_price',
+    'asset_or_nothing_price',
+    'swaption_price'
 ]
 
-# @jit
-# def _ncdf(x, dtype=jnp.float64):
-#     _TWO = jnp.asarray(2, dtype)
-#     _SQRT_2 = jnp.sqrt(_TWO)
-#     return (jax.lax.erf(x / _SQRT_2) + 1) / 2
     
 def option_price(*,
-                 volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
-                 strikes: Union[jnp.ndarray, np.ndarray, List[float]],
-                 expiries: Union[jnp.ndarray, np.ndarray, List[float]],
-                 spots: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 forwards: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 discount_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 dividend_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 discount_factors: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 is_call_options: Union[jnp.ndarray, np.ndarray, List[bool]] = None,
+                 volatilities: Union[jnp.ndarray, np.ndarray],
+                 strikes: Union[jnp.ndarray, np.ndarray],
+                 expiries: Union[jnp.ndarray, np.ndarray],
+                 spots: Union[jnp.ndarray, np.ndarray] = None,
+                 forwards: Union[jnp.ndarray, np.ndarray] = None,
+                 discount_rates: Union[jnp.ndarray, np.ndarray] = None,
+                 dividend_rates: Union[jnp.ndarray, np.ndarray] = None,
+                 discount_factors: Union[jnp.ndarray, np.ndarray] = None,
+                 is_call_options: Union[jnp.ndarray, np.ndarray] = None,
                  is_normal_volatility: bool = False,
-                 dtype: jnp.dtype = jnp.float64
+                 dtype: jnp.dtype = None
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of call or put options.
     #### Example
@@ -114,8 +114,8 @@ def option_price(*,
         raise ValueError('At most one of discount_rates and discount_factors may '
                         'be supplied')
     
-    dtype = dtype or jnp.float64
     strikes = jnp.asarray(strikes, dtype=dtype)
+    dtype = strikes.dtype
     volatilities = jnp.asarray(volatilities, dtype=dtype)
     expiries = jnp.asarray(expiries, dtype=dtype)
 
@@ -148,7 +148,7 @@ def option_price(*,
         undiscounted_calls = jnp.where(sqrt_var > 0,
                                     forwards * ncdf(d1) - strikes * ncdf(d2),
                                     jnp.maximum(forwards - strikes, 0.0))
-      # normal model
+    # normal model
     else:
         d1 = divide_no_nan((forwards - strikes), sqrt_var)
         undiscounted_calls = jnp.where(
@@ -166,18 +166,18 @@ def option_price(*,
     return discount_factors * jnp.where(predicate, undiscounted_calls, undiscounted_puts)
 
 def barrier_price(*,
-                  volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
-                  strikes: Union[jnp.ndarray, np.ndarray, List[float]],
-                  expiries: Union[jnp.ndarray, np.ndarray, List[float]],
-                  spots: Union[jnp.ndarray, np.ndarray, List[float]],
-                  barriers: Union[jnp.ndarray, np.ndarray, List[float]],
-                  rebates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                  discount_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                  dividend_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                  is_barrier_down: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                  is_knock_out: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                  is_call_options: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                  dtype: jnp.dtype = jnp.float64
+                  volatilities: Union[jnp.ndarray, np.ndarray],
+                  strikes: Union[jnp.ndarray, np.ndarray],
+                  expiries: Union[jnp.ndarray, np.ndarray],
+                  spots: Union[jnp.ndarray, np.ndarray],
+                  barriers: Union[jnp.ndarray, np.ndarray],
+                  rebates: Union[jnp.ndarray, np.ndarray,] = None,
+                  discount_rates: Union[jnp.ndarray, np.ndarray] = None,
+                  dividend_rates: Union[jnp.ndarray, np.ndarray] = None,
+                  is_barrier_down: Union[jnp.ndarray, np.ndarray] = None,
+                  is_knock_out: Union[jnp.ndarray, np.ndarray] = None,
+                  is_call_options: Union[jnp.ndarray, np.ndarray] = None,
+                  dtype: jnp.dtype = None
                   ) -> jnp.ndarray:
     """Prices barrier options in a Black-Scholes Model.
     Computes the prices of options with a single barrier in Black-Scholes world as
@@ -268,9 +268,8 @@ def barrier_price(*,
     # appropriate terms for calculating the integral. Then a dot product of each
     # row in the matricies coupled with the masks work to calculate the prices of
     # the barriers option.
-    dtype = dtype or jnp.float64
-
     spots = jnp.asarray(spots, dtype=dtype)
+    dtype = spots.dtype
     strikes = jnp.asarray(strikes, dtype=dtype)
     volatilities = jnp.asarray(volatilities, dtype=dtype)
     expiries = jnp.asarray(expiries, dtype=dtype)
@@ -413,17 +412,17 @@ def barrier_price(*,
     return jnp.sum(masks * terms_mat * cdf_mat, axis=strike_rank)
 
 def binary_price(*,
-                 volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
-                 strikes: Union[jnp.ndarray, np.ndarray, List[float]],
-                 expiries: Union[jnp.ndarray, np.ndarray, List[float]],
-                 spots: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 forwards: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 discount_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 dividend_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 discount_factors: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                 is_call_options: Union[jnp.ndarray, np.ndarray, List[bool]] = None,
+                 volatilities: Union[jnp.ndarray, np.ndarray],
+                 strikes: Union[jnp.ndarray, np.ndarray],
+                 expiries: Union[jnp.ndarray, np.ndarray],
+                 spots: Union[jnp.ndarray, np.ndarray] = None,
+                 forwards: Union[jnp.ndarray, np.ndarray] = None,
+                 discount_rates: Union[jnp.ndarray, np.ndarray] = None,
+                 dividend_rates: Union[jnp.ndarray, np.ndarray] = None,
+                 discount_factors: Union[jnp.ndarray, np.ndarray] = None,
+                 is_call_options: Union[jnp.ndarray, np.ndarray] = None,
                  is_normal_volatility: bool = False,
-                 dtype: jnp.dtype = jnp.float64
+                 dtype: jnp.dtype = None
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of binary call or put options.
     The binary call (resp. put) option priced here is that which pays off a unit
@@ -510,9 +509,8 @@ def binary_price(*,
         raise ValueError('At most one of discount_rates and discount_factors may '
                         'be supplied')
 
-    dtype = dtype or jnp.float64
     strikes = jnp.asarray(strikes, dtype=dtype)
-    
+    dtype = strikes.dtype
     volatilities = jnp.asarray(volatilities, dtype=dtype)
     expiries = jnp.asarray(expiries, dtype=dtype)
 
@@ -556,17 +554,17 @@ def binary_price(*,
 
 
 def asset_or_nothing_price(*,
-                            volatilities: Union[jnp.ndarray, np.ndarray, List[float]],
-                            strikes: Union[jnp.ndarray, np.ndarray, List[float]],
-                            expiries: Union[jnp.ndarray, np.ndarray, List[float]],
-                            spots: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                            forwards: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                            discount_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                            dividend_rates: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                            discount_factors: Union[jnp.ndarray, np.ndarray, List[float]] = None,
-                            is_call_options: Union[jnp.ndarray, np.ndarray, List[bool]] = None,
-                            is_normal_volatility: jnp.bool_ = False,
-                            dtype: jnp.dtype = jnp.float64
+                            volatilities: Union[jnp.ndarray, np.ndarray],
+                            strikes: Union[jnp.ndarray, np.ndarray],
+                            expiries: Union[jnp.ndarray, np.ndarray],
+                            spots: Union[jnp.ndarray, np.ndarray] = None,
+                            forwards: Union[jnp.ndarray, np.ndarray] = None,
+                            discount_rates: Union[jnp.ndarray, np.ndarray] = None,
+                            dividend_rates: Union[jnp.ndarray, np.ndarray] = None,
+                            discount_factors: Union[jnp.ndarray, np.ndarray] = None,
+                            is_call_options: Union[jnp.ndarray, np.ndarray] = None,
+                            is_normal_volatility: bool = False,
+                            dtype: jnp.dtype = None
                             ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of asset-or-nothing options.
     The asset-or-nothing call (resp. put) pays out one unit of the underlying
@@ -652,9 +650,8 @@ def asset_or_nothing_price(*,
         raise ValueError('At most one of discount_rates and discount_factors may '
                         'be supplied')
 
-    dtype = dtype or jnp.float64
     strikes = jnp.asarray(strikes, dtype=dtype)
-
+    dtype = strikes.dtype
     volatilities = jnp.asarray(volatilities, dtype=dtype)
     expiries = jnp.asarray(expiries, dtype=dtype)
 
