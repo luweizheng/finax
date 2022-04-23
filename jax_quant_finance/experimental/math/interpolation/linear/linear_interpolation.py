@@ -30,7 +30,7 @@ def interpolate(x,
     x, x_data, y_data = shape_utils.broadcast_common_batch_shape(x, x_data, y_data)
     
     # Rank of the inputs is known
-    # tf.rank -> jnp.ndim
+    #  tf.rank -> jnp.ndim
     batch_rank = jnp.ndim(x) - 1
     if batch_rank == 0:
         x = jnp.expand_dims(x, 0)
