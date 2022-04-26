@@ -471,7 +471,7 @@ class VanillaPrice(jtu.JaxTestCase):
 
     #     with tf.GradientTape(persistent=True) as tape:
     #     tape.watch([vol, strikes, expiries, forwards])
-    #     price = tff.black_scholes.option_price(
+    #     price = jqf.black_scholes.option_price(
     #         volatilities=vol,
     #         strikes=strikes,
     #         expiries=expiries,
