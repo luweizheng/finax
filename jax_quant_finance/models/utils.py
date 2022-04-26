@@ -67,15 +67,15 @@ def prepare_grid(*, times, time_step, dtype, tolerance=None,
             time_indices,
             jnp.maximum(time_indices - 1, 0))
     
-    # Create a boolean mask to identify the iterations that have to be recorded.
+    # Create a mask to identify the iterations that have to be recorded.
     # Use `tf.scatter_nd` because it handles duplicates. Also we first create
     # an int64 Tensor and then create a boolean mask because scatter_nd with
     # booleans is currently not supported on GPUs.
     mask = ops.scatter_nd(
-        indices=jnp.expand_dims(jnp.asarray(time_indices, dtype=jnp.int64), axis=1),
+        indices=jnp.expand_dims(jnp.asarray(time_indices), axis=1),
         updates=jnp.ones(times.shape),
         shape=all_times.shape)
-    mask = jnp.where(mask > 0, True, False)
+    mask = jnp.where(mask > 0, 1, 0)
 
     return all_times, mask, time_indices
 
