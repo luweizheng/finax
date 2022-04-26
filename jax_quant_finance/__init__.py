@@ -11,9 +11,9 @@ def _check_py_version():
 
 # make sure jax is installed
 def _ensure_jax_install():
-    """Attempt to import tensorflow, and make sure its version is sufficient.
+    """Attempt to import JAX, and make sure its version is sufficient.
     Raises:
-        ImportError: if either tensorflow is not importable or its version is
+        ImportError: if either JAX is not importable or its version is
         inadequate.
     """
     try:

@@ -13,8 +13,7 @@ config.update("jax_enable_x64", True)
 from absl.testing import absltest
 from absl.testing import parameterized
 
-from jax._src import test_util as jtu # pylint: disable=g-direct-tensorflow-import
-
+from jax._src import test_util as jtu
 jqf_int = jqf.math.integration
 
 IntegrationTestCase = collections.namedtuple('IntegrationTestCase', [

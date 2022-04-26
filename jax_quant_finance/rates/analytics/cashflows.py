@@ -27,21 +27,19 @@ def present_value(cashflows, discount_factors, dtype=jnp.float64):
     ```
 
     Args:
-    cashflows: A real `Tensor` of shape `batch_shape + [n]`. The set of
+    cashflows: A real `ndarray` of shape `batch_shape + [n]`. The set of
         cashflows of underlyings. `n` is the number of cashflows per bond
         and `batch_shape` is the number of bonds. Bonds with different number
         of cashflows should be padded to a common number `n`.
-    discount_factors: A `Tensor` of the same `dtype` as `cashflows` and of
+    discount_factors: A `ndarray` of the same `dtype` as `cashflows` and of
         compatible shape. The set of discount factors corresponding to the
         cashflows.
-    dtype: `tf.Dtype`. If supplied the dtype for the input and output `Tensor`s.
+    dtype: If supplied the dtype for the input and output `ndarray`s.
         Default value: None which maps to the default dtype inferred from
         `cashflows`.
-    name: Python str. The name to give to the ops created by this function.
-        Default value: None which maps to 'present_value'.
 
     Returns:
-    Real `Tensor` of shape `batch_shape`. The present values of the cashflows.
+    Real `ndarray` of shape `batch_shape`. The present values of the cashflows.
     """
     cashflows = jnp.asarray(cashflows, dtype=dtype)
     dtype = dtype or cashflows.dtype
@@ -71,26 +69,26 @@ def pv_from_yields(cashflows,
     3 year expiry. The yields to maturity (ytm) are 7% and 5% respectively.
 
     ```python
-    dtype = np.float64
+    dtype = jnp.float64
 
     # The first element is the ytm of the first bond and the second is the
     # yield of the second bond.
-    yields_to_maturity = np.array([0.07, 0.05], dtype=dtype)
+    yields_to_maturity = jnp.asarray([0.07, 0.05], dtype=dtype)
 
     # 2 and 3 year bonds with 1000 face value and 4%, 6% semi-annual coupons.
     # Note that the first four entries in the cashflows are the cashflows of
     # the first bond (group=0) and the next six are the cashflows of the second
     # bond (group=1).
-    cashflows = np.array([20, 20, 20, 1020, 30, 30, 30, 30, 30, 1030],
+    cashflows = jnp.asarray([20, 20, 20, 1020, 30, 30, 30, 30, 30, 1030],
                             dtype=dtype)
 
     # The times of the cashflows.
-    times = np.array([0.5, 1, 1.5, 2, 0.5, 1, 1.50, 2, 2.5, 3], dtype=dtype)
+    times = jnp.asarray([0.5, 1, 1.5, 2, 0.5, 1, 1.50, 2, 2.5, 3], dtype=dtype)
 
     # Group entries take values between 0 and 1 (inclusive) as there are two
     # bonds. One needs to assign each of the cashflow entries to one group or
     # the other.
-    groups = np.array([0] * 4 + [1] * 6)
+    groups = jnp.asarray([0] * 4 + [1] * 6)
 
     # Produces [942.712, 1025.778] as the values of the two bonds.
     present_values = pv_from_yields(
@@ -103,29 +101,27 @@ def pv_from_yields(cashflows,
     June 2006.
 
     Args:
-    cashflows: Real rank 1 `Tensor` of size `n`. The set of cashflows underlying
+    cashflows: Real rank 1 `ndarray` of size `n`. The set of cashflows underlying
         the bonds.
-    times: Real positive rank 1 `Tensor` of size `n`. The set of times at which
+    times: Real positive rank 1 `ndarray` of size `n`. The set of times at which
         the corresponding cashflows occur quoted in years.
-    yields: Real rank 1 `Tensor` of size `1` if `groups` is None or of size `k`
+    yields: Real rank 1 `ndarray` of size `1` if `groups` is None or of size `k`
         if the maximum value in the `groups` is of `k-1`. The continuously
         compounded yields to maturity/internal rate of returns corresponding to
         each of the cashflow groups. The `i`th component is the yield to apply to
         all the cashflows with group label `i` if `groups` is not None. If
-        `groups` is None, then this is a `Tensor` of size `[1]` and the only
+        `groups` is None, then this is a `ndarray` of size `[1]` and the only
         component is the yield that applies to all the cashflows.
-    groups: Optional int `Tensor` of size `n` containing values between 0 and
+    groups: Optional int `ndarray` of size `n` containing values between 0 and
         `k-1` where `k` is the number of related cashflows.
         Default value: None. This implies that all the cashflows are treated as a
         single group.
-    dtype: `tf.Dtype`. If supplied the dtype for the input and output `Tensor`s.
+    dtype: `jnp.dtype`. If supplied the dtype for the input and output `ndarray`s.
         Default value: None which maps to the default dtype inferred from
         `cashflows`.
-    name: Python str. The name to give to the ops created by this function.
-        Default value: None which maps to 'pv_from_yields'.
 
     Returns:
-    Real rank 1 `Tensor` of size `k` if groups is not `None` else of size `[1]`.
+    Real rank 1 `ndarray` of size `k` if groups is not `None` else of size `[1]`.
         The present value of the cashflows. The `i`th component is the present
         value of the cashflows in group `i` or to the entirety of the cashflows
         if `groups` is None.
