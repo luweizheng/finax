@@ -23,31 +23,28 @@ def integrate(func,
     #### Example
     ```python
         f = lambda x: x*x
-        a = tf.constant(0.0)
-        b = tf.constant(3.0)
+        a = jnp.asarray(0.0)
+        b = jnp.asarray(3.0)
         integrate(f, a, b) # 9.0
     ```
 
     Args:
         func: Python callable representing a function to be integrated. It must be a
-        callable of a single `Tensor` parameter and return a `Tensor` of the same
+        callable of a single `ndarray` parameter and return a `ndarray` of the same
         shape and dtype as its input. It will be called with a `Tesnor` of shape
         `lower.shape + [n]` (where n is integer number of points) and of the same
         `dtype` as `lower`.
-        lower: `Tensor` or Python float representing the lower limits of
+        lower: `ndarray` or Python float representing the lower limits of
         integration. `func` will be integrated between each pair of points defined
         by `lower` and `upper`.
-        upper: `Tensor` of the same shape and dtype as `lower` or Python float
+        upper: `ndarray` of the same shape and dtype as `lower` or Python float
         representing the upper limits of intergation.
         method: Integration method. Instance of IntegrationMethod enum. Default is
         IntegrationMethod.COMPOSITE_SIMPSONS_RULE.
-        dtype: Dtype of result. Must be real dtype. Defaults to dtype of `lower`.
-        name: Python str. The name to give to the ops created by this function.
-        Default value: None which maps to 'integrate'.
-        **kwargs: Additional parameters for specific integration method.
+        dtype: Dtype of result. Must be real dtype.
 
     Returns:
-        `Tensor` of the same shape and dtype as `lower`, containing the value of the
+        `ndarray` of the same shape and dtype as `lower`, containing the value of the
         definite integral.
 
     Raises: ValueError if `method` was not recognized.

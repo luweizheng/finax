@@ -16,33 +16,30 @@ def simpson(func, lower, upper, num_points=1001, dtype=None, name=None):
     #### Example
     ```python
         f = lambda x: x*x
-        a = tf.constant(0.0)
-        b = tf.constant(3.0)
+        a = jnp.asarray(0.0)
+        b = jnp.asarray(3.0)
         integrate(f, a, b, num_points=1001) # 9.0
     ```
 
     Args:
         func: Python callable representing a function to be integrated. It must be a
-        callable of a single `Tensor` parameter and return a `Tensor` of the same
+        callable of a single `ndarray` parameter and return a `ndarray` of the same
         shape and dtype as its input. It will be called with a `Tesnor` of shape
         `lower.shape + [n]` (where n is integer number of points) and of the same
         `dtype` as `lower`.
-        lower: `Tensor` or Python float representing the lower limits of
+        lower: `ndarray` or Python float representing the lower limits of
         integration. `func` will be integrated between each pair of points defined
         by `lower` and `upper`.
-        upper: `Tensor` of the same shape and dtype as `lower` or Python float
+        upper: `ndarray` of the same shape and dtype as `lower` or Python float
         representing the upper limits of intergation.
-        num_points: Scalar int32 `Tensor`. Number of points at which function `func`
+        num_points: Scalar int32 `ndarray`. Number of points at which function `func`
         will be evaluated. Must be odd and at least 3.
         Default value: 1001.
-        dtype: Optional `tf.Dtype`. If supplied, the dtype for the `lower` and
+        dtype: Optional `jnp.dtype`. If supplied, the dtype for the `lower` and
         `upper`. Result will have the same dtype.
-        Default value: None which maps to dtype of `lower`.
-        name: Python str. The name to give to the ops created by this function.
-        Default value: None which maps to 'integrate_simpson_composite'.
 
     Returns:
-        `Tensor` of shape `func_batch_shape + limits_batch_shape`, containing
+        `ndarray` of shape `func_batch_shape + limits_batch_shape`, containing
         value of the definite integral.
         
     TODO: Add Error control
