@@ -11,7 +11,7 @@ def diff(x, order=1, exclusive=False, axis=-1, dtype=None):
     ```
 
     This is the same as doing `x[..., order:] - x[..., :-order]`. Note that in
-    this case the result `Tensor` is smaller in size than the input `Tensor`.
+    this case the result `ndarray` is smaller in size than the input `ndarray`.
 
     If exclusive is False, then computes:
 

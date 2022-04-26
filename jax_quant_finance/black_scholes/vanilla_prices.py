@@ -35,19 +35,19 @@ def option_price(*,
     #### Example
 
     ```python
-        # Price a batch of 5 vanilla call options.
-        volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
-        forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        # Strikes will automatically be broadcasted to shape [5].
-        strikes = np.array([3.0])
-        # Expiries will be broadcast to shape [5], i.e. each option has strike=3
-        # and expiry = 1.
-        expiries = 1.0
-        computed_prices = jqf.black_scholes.option_price(
-            volatilities=volatilities,
-            strikes=strikes,
-            expiries=expiries,
-            forwards=forwards)
+    # Price a batch of 5 vanilla call options.
+    volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+    forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    # Strikes will automatically be broadcasted to shape [5].
+    strikes = np.array([3.0])
+    # Expiries will be broadcast to shape [5], i.e. each option has strike=3
+    # and expiry = 1.
+    expiries = 1.0
+    computed_prices = jqf.black_scholes.option_price(
+        volatilities=volatilities,
+        strikes=strikes,
+        expiries=expiries,
+        forwards=forwards)
     # Expected print output of computed prices:
     # [ 0.          2.          2.04806848  1.00020297  2.07303131]
     ```
@@ -59,54 +59,53 @@ def option_price(*,
 
     Args:
         volatilities: Real `ndarray` of any shape and dtype. The volatilities to
-        expiry of the options to price.
+            expiry of the options to price.
         strikes: A real `ndarray` of the same dtype and compatible shape as
-        `volatilities`. The strikes of the options to be priced.
+            `volatilities`. The strikes of the options to be priced.
         expiries: A real `ndarray` of same dtype and compatible shape as
-        `volatilities`. The expiry of each option. The units should be such that
-        `expiry * volatility**2` is dimensionless.
+            `volatilities`. The expiry of each option.
         spots: A real `ndarray` of any shape that broadcasts to the shape of the
-        `volatilities`. The current spot price of the underlying. Either this
-        argument or the `forwards` (but not both) must be supplied.
+            `volatilities`. The current spot price of the underlying. Either this
+            argument or the `forwards` (but not both) must be supplied.
         forwards: A real `ndarray` of any shape that broadcasts to the shape of
-        `volatilities`. The forwards to maturity. Either this argument or the
-        `spots` must be supplied but both must not be supplied.
+            `volatilities`. The forwards to maturity. Either this argument or the
+            `spots` must be supplied but both must not be supplied.
         discount_rates: An optional real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`.
-        If not `None`, discount factors are calculated as e^(-rT),
-        where r are the discount rates, or risk free rates. At most one of
-        `discount_rates` and `discount_factors` can be supplied.
-        Default value: `None`, equivalent to r = 0 and discount factors = 1 when
-        `discount_factors` also not given.
+            `volatilities` and of the shape that broadcasts with `volatilities`.
+            If not `None`, discount factors are calculated as e^(-rT),
+            where r are the discount rates, or risk free rates. At most one of
+            `discount_rates` and `discount_factors` can be supplied.
+            Default value: `None`, equivalent to r = 0 and discount factors = 1 when
+            `discount_factors` also not given.
         dividend_rates: An optional real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`.
-        Default value: `None`, equivalent to q = 0.
+            `volatilities` and of the shape that broadcasts with `volatilities`.
+            Default value: `None`, equivalent to q = 0.
         discount_factors: An optional real `ndarray` of same dtype as the
-        `volatilities`. If not `None`, these are the discount factors to expiry
-        (i.e. e^(-rT)). Mutually exclusive with `discount_rates`. If neither is
-        given, no discounting is applied (i.e. the undiscounted option price is
-        returned). If `spots` is supplied and `discount_factors` is not `None`
-        then this is also used to compute the forwards to expiry. At most one of
-        `discount_rates` and `discount_factors` can be supplied.
-        Default value: `None`, which maps to e^(-rT) calculated from
-        discount_rates.
+            `volatilities`. If not `None`, these are the discount factors to expiry
+            (i.e. e^(-rT)). Mutually exclusive with `discount_rates`. If neither is
+            given, no discounting is applied (i.e. the undiscounted option price is
+            returned). If `spots` is supplied and `discount_factors` is not `None`
+            then this is also used to compute the forwards to expiry. At most one of
+            `discount_rates` and `discount_factors` can be supplied.
+            Default value: `None`, which maps to e^(-rT) calculated from
+             discount_rates.
         is_call_options: A boolean `ndarray` of a shape compatible with
-        `volatilities`. Indicates whether the option is a call (if True) or a put
-        (if False). If not supplied, call options are assumed.
+            `volatilities`. Indicates whether the option is a call (if True) or a put
+            (if False). If not supplied, call options are assumed.
         is_normal_volatility: An optional Python boolean specifying whether the
-        `volatilities` correspond to lognormal Black volatility (if False) or
-        normal Black volatility (if True).
-        Default value: False, which corresponds to lognormal volatility.
-        dtype: Optional `jnp.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`ndarray` arguments to `ndarray`. Default value: `None`.
+            `volatilities` correspond to lognormal Black volatility (if False) or
+            normal Black volatility (if True).
+            Default value: False, which corresponds to lognormal volatility.
+        dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+            `ndarray` data type conversion. 
+            Default value: `None`.
 
     Returns:
         option_prices: A `ndarray` of the same shape as `forwards`. The Black
-        Scholes price of the options.
+            Scholes price of the options.
 
     Raises:
-        ValueError: If both `forwards` and `spots` are supplied or if neither is
-        supplied.
+        ValueError: If both `forwards` and `spots` are supplied or if neither is supplied.
         ValueError: If both `discount_rates` and `discount_factors` is supplied.
     """
 
@@ -225,51 +224,51 @@ def barrier_price(*,
     2nd Edition, 1997
 
     Args:
-    volatilities: Real `ndarray` of any shape and dtype. The volatilities to
-        expiry of the options to price.
-    strikes: A real `ndarray` of the same dtype and compatible shape as
-        `volatilities`. The strikes of the options to be priced.
-    expiries: A real `ndarray` of same dtype and compatible shape as
-        `volatilities`. The expiry of each option. The units should be such that
-        `expiry * volatility**2` is dimensionless.
-    spots: A real `ndarray` of any shape that broadcasts to the shape of the
-        `volatilities`. The current spot price of the underlying.
-    barriers: A real `ndarray` of same dtype as the `volatilities` and of the
-        shape that broadcasts with `volatilities`. The barriers of each option.
-    rebates: A real `ndarray` of same dtype as the `volatilities` and of the
-        shape that broadcasts with `volatilities`. For knockouts, this is a
-        fixed cash payout in case the barrier is breached. For knockins, this is a
-        fixed cash payout in case the barrier level is not breached. In the former
-        case, the rebate is paid immediately on breach whereas in the latter, the
-        rebate is paid at the expiry of the option.
-        Default value: `None` which maps to no rebates.
-    discount_rates: A real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`.
-        Discount rates, or risk free rates.
-        Default value: `None`, equivalent to discount_rate = 0.
-    dividend_rates: A real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`. A
-        continuous dividend rate paid by the underlier. If `None`, then
-        defaults to zero dividends.
-        Default value: `None`, equivalent to zero dividends.
-    is_barrier_down: A real `ndarray` of `boolean` values and of the shape
-        that broadcasts with `volatilities`. True if barrier is below asset
-        price at expiration.
-        Default value: `True`.
-    is_knock_out: A real `ndarray` of `boolean` values and of the shape
-        that broadcasts with `volatilities`. True if option is knock out
-        else false.
-        Default value: `True`.
-    is_call_options: A real `ndarray` of `boolean` values and of the shape
-        that broadcasts with `volatilities`. True if option is call else
-        false.
-        Default value: `True`.
-    dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`ndarray` arguments to `ndarray`.
-        Default value: `None`.
+        volatilities: Real `ndarray` of any shape and dtype. The volatilities to
+            expiry of the options to price.
+        strikes: A real `ndarray` of the same dtype and compatible shape as
+            `volatilities`. The strikes of the options to be priced.
+        expiries: A real `ndarray` of same dtype and compatible shape as
+            `volatilities`. The expiry of each option. The units should be such that
+            `expiry * volatility**2` is dimensionless.
+        spots: A real `ndarray` of any shape that broadcasts to the shape of the
+            `volatilities`. The current spot price of the underlying.
+        barriers: A real `ndarray` of same dtype as the `volatilities` and of the
+            shape that broadcasts with `volatilities`. The barriers of each option.
+        rebates: A real `ndarray` of same dtype as the `volatilities` and of the
+            shape that broadcasts with `volatilities`. For knockouts, this is a
+            fixed cash payout in case the barrier is breached. For knockins, this is a
+            fixed cash payout in case the barrier level is not breached. In the former
+            case, the rebate is paid immediately on breach whereas in the latter, the
+            rebate is paid at the expiry of the option.
+            Default value: `None` which maps to no rebates.
+        discount_rates: A real `ndarray` of same dtype as the
+            `volatilities` and of the shape that broadcasts with `volatilities`.
+            Discount rates, or risk free rates.
+            Default value: `None`, equivalent to discount_rate = 0.
+        dividend_rates: A real `ndarray` of same dtype as the
+            `volatilities` and of the shape that broadcasts with `volatilities`. A
+            continuous dividend rate paid by the underlier. If `None`, then
+            defaults to zero dividends.
+            Default value: `None`, equivalent to zero dividends.
+        is_barrier_down: A real `ndarray` of `boolean` values and of the shape
+            that broadcasts with `volatilities`. True if barrier is below asset
+            price at expiration.
+            Default value: `True`.
+        is_knock_out: A real `ndarray` of `boolean` values and of the shape
+            that broadcasts with `volatilities`. True if option is knock out
+            else false.
+            Default value: `True`.
+        is_call_options: A real `ndarray` of `boolean` values and of the shape
+            that broadcasts with `volatilities`. True if option is call else
+            false.
+            Default value: `True`.
+        dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+            `ndarray` data type conversion. 
+            Default value: `None`.
     Returns:
-    option_prices: A `ndarray` of same shape as `spots`. The approximate price of
-    the barriers option under black scholes.
+        option_prices: A `ndarray` of same shape as `spots`. The approximate price of
+            the barriers option under black scholes.
     """
     # The computation is done as in Ref [2] where each integral is split into
     # two matrices. The first matrix contains the algebraic terms and the second
@@ -467,55 +466,55 @@ def binary_price(*,
     https://en.wikipedia.org/w/index.php?title=Binary_option
 
     Args:
-    volatilities: Real `ndarray` of any shape and dtype. The volatilities to
-        expiry of the options to price.
-    strikes: A real `ndarray` of the same dtype and compatible shape as
-        `volatilities`. The strikes of the options to be priced.
-    expiries: A real `ndarray` of same dtype and compatible shape as
-        `volatilities`. The expiry of each option. The units should be such that
-        `expiry * volatility**2` is dimensionless.
-    spots: A real `ndarray` of any shape that broadcasts to the shape of the
-        `volatilities`. The current spot price of the underlying. Either this
-        argument or the `forwards` (but not both) must be supplied.
-    forwards: A real `ndarray` of any shape that broadcasts to the shape of
-        `volatilities`. The forwards to maturity. Either this argument or the
-        `spots` must be supplied but both must not be supplied.
-    discount_rates: An optional real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`.
-        If not `None`, discount factors are calculated as e^(-rT),
-        where r are the discount rates, or risk free rates. At most one of
-        discount_rates and discount_factors can be supplied.
-        Default value: `None`, equivalent to r = 0 and discount factors = 1 when
-        discount_factors also not given.
-    dividend_rates: An optional real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`.
-        Default value: `None`, equivalent to q = 0.
-    discount_factors: An optional real `ndarray` of same dtype as the
-        `volatilities`. If not None, these are the discount factors to expiry
-        (i.e. e^(-rT)). If None, no discounting is applied (i.e. the undiscounted
-        option price is returned). If `spots` is supplied and `discount_factors`
-        is not None then this is also used to compute the forwards to expiry.
-        Default value: None, equivalent to discount factors = 1.
-    is_call_options: A boolean `ndarray` of a shape compatible with
-        `volatilities`. Indicates whether the option is a call (if True) or a put
-        (if False). If not supplied, call options are assumed.
-    is_normal_volatility: An optional Python boolean specifying whether the
-        `volatilities` correspond to lognormal Black volatility (if False) or
-        normal Black volatility (if True).
-        Default value: False, which corresponds to lognormal volatility.
-    dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`ndarray` arguments to `ndarray`.
-        Default value: None.
+        volatilities: Real `ndarray` of any shape and dtype. The volatilities to
+            expiry of the options to price.
+        strikes: A real `ndarray` of the same dtype and compatible shape as
+            `volatilities`. The strikes of the options to be priced.
+        expiries: A real `ndarray` of same dtype and compatible shape as
+            `volatilities`. The expiry of each option. The units should be such that
+            `expiry * volatility**2` is dimensionless.
+        spots: A real `ndarray` of any shape that broadcasts to the shape of the
+            `volatilities`. The current spot price of the underlying. Either this
+            argument or the `forwards` (but not both) must be supplied.
+        forwards: A real `ndarray` of any shape that broadcasts to the shape of
+            `volatilities`. The forwards to maturity. Either this argument or the
+            `spots` must be supplied but both must not be supplied.
+        discount_rates: An optional real `ndarray` of same dtype as the
+            `volatilities` and of the shape that broadcasts with `volatilities`.
+            If not `None`, discount factors are calculated as e^(-rT),
+            where r are the discount rates, or risk free rates. At most one of
+            discount_rates and discount_factors can be supplied.
+            Default value: `None`, equivalent to r = 0 and discount factors = 1 when
+            discount_factors also not given.
+        dividend_rates: An optional real `ndarray` of same dtype as the
+            `volatilities` and of the shape that broadcasts with `volatilities`.
+            Default value: `None`, equivalent to q = 0.
+        discount_factors: An optional real `ndarray` of same dtype as the
+            `volatilities`. If not None, these are the discount factors to expiry
+            (i.e. e^(-rT)). If None, no discounting is applied (i.e. the undiscounted
+            option price is returned). If `spots` is supplied and `discount_factors`
+            is not None then this is also used to compute the forwards to expiry.
+            Default value: None, equivalent to discount factors = 1.
+        is_call_options: A boolean `ndarray` of a shape compatible with
+            `volatilities`. Indicates whether the option is a call (if True) or a put
+            (if False). If not supplied, call options are assumed.
+        is_normal_volatility: An optional Python boolean specifying whether the
+            `volatilities` correspond to lognormal Black volatility (if False) or
+            normal Black volatility (if True).
+            Default value: False, which corresponds to lognormal volatility.
+        dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+            `ndarray` data type conversion. 
+            Default value: `None`.
 
     Returns:
-    binary_prices: A `ndarray` of the same shape as `forwards`. The Black
-    Scholes price of the binary options.
+        binary_prices: A `ndarray` of the same shape as `forwards`. The Black
+        Scholes price of the binary options.
 
     Raises:
-    ValueError: If both `forwards` and `spots` are supplied or if neither is
-        supplied.
-    ValueError: If both `discount_rates` and `discount_factors` is supplied.
+        ValueError: If both `forwards` and `spots` are supplied or if neither is supplied.
+        ValueError: If both `discount_rates` and `discount_factors` is supplied.
     """
+
     if (spots is None) == (forwards is None):
         raise ValueError('Either spots or forwards must be supplied but not both.')
     if (discount_rates is not None) and (discount_factors is not None):
@@ -561,6 +560,7 @@ def binary_price(*,
 
     if is_call_options is None:
         return discount_factors * undiscounted_calls
+    
     undiscounted_puts = 1 - undiscounted_calls
     predicate = jnp.broadcast_to(is_call_options, undiscounted_calls.shape)
     return discount_factors * jnp.where(predicate, undiscounted_calls, undiscounted_puts)
@@ -648,8 +648,8 @@ def asset_or_nothing_price(*,
         `volatilities` correspond to lognormal Black volatility (if False) or
         normal Black volatility (if True).
         Default value: False, which corresponds to lognormal volatility.
-    dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`ndarray` arguments to `ndarray`.
+    dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+        `ndarray` data type conversion. 
         Default value: `None`.
 
     Returns:
@@ -836,12 +836,13 @@ def swaption_price(*,
         `volatilities` correspond to normal Black volatility (if True) or
         lognormal Black volatility (if False).
         Default value: True, which corresponds to normal volatility.
-    dtype: The default dtype to use when converting values to `ndarray`s.
+    dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+        `ndarray` data type conversion. 
         Default value: `None`.
 
     Returns:
-    A `ndarray` of real dtype and shape `batch_shape` containing the
-    computed swaption prices.
+        A `ndarray` of real dtype and shape `batch_shape` containing the
+        computed swaption prices.
     """    
     volatilities = jnp.asarray(volatilities, dtype=dtype)
     expiries = jnp.asarray(expiries, dtype=dtype)
