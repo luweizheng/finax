@@ -31,7 +31,9 @@ def option_price(*,
                  dtype: jnp.dtype = None
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of call or put options.
+
     #### Example
+
     ```python
         # Price a batch of 5 vanilla call options.
         volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
@@ -41,7 +43,7 @@ def option_price(*,
         # Expiries will be broadcast to shape [5], i.e. each option has strike=3
         # and expiry = 1.
         expiries = 1.0
-        computed_prices = tff.black_scholes.option_price(
+        computed_prices = jqf.black_scholes.option_price(
             volatilities=volatilities,
             strikes=strikes,
             expiries=expiries,
@@ -49,35 +51,37 @@ def option_price(*,
     # Expected print output of computed prices:
     # [ 0.          2.          2.04806848  1.00020297  2.07303131]
     ```
+
     #### References:
     [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
     [2] Wikipedia contributors. Black-Scholes model. Available at:
         https://en.wikipedia.org/w/index.php?title=Black%E2%80%93Scholes_model
+
     Args:
-        volatilities: Real `Tensor` of any shape and dtype. The volatilities to
+        volatilities: Real `ndarray` of any shape and dtype. The volatilities to
         expiry of the options to price.
-        strikes: A real `Tensor` of the same dtype and compatible shape as
+        strikes: A real `ndarray` of the same dtype and compatible shape as
         `volatilities`. The strikes of the options to be priced.
-        expiries: A real `Tensor` of same dtype and compatible shape as
+        expiries: A real `ndarray` of same dtype and compatible shape as
         `volatilities`. The expiry of each option. The units should be such that
         `expiry * volatility**2` is dimensionless.
-        spots: A real `Tensor` of any shape that broadcasts to the shape of the
+        spots: A real `ndarray` of any shape that broadcasts to the shape of the
         `volatilities`. The current spot price of the underlying. Either this
         argument or the `forwards` (but not both) must be supplied.
-        forwards: A real `Tensor` of any shape that broadcasts to the shape of
+        forwards: A real `ndarray` of any shape that broadcasts to the shape of
         `volatilities`. The forwards to maturity. Either this argument or the
         `spots` must be supplied but both must not be supplied.
-        discount_rates: An optional real `Tensor` of same dtype as the
+        discount_rates: An optional real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`.
         If not `None`, discount factors are calculated as e^(-rT),
         where r are the discount rates, or risk free rates. At most one of
         `discount_rates` and `discount_factors` can be supplied.
         Default value: `None`, equivalent to r = 0 and discount factors = 1 when
         `discount_factors` also not given.
-        dividend_rates: An optional real `Tensor` of same dtype as the
+        dividend_rates: An optional real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`.
         Default value: `None`, equivalent to q = 0.
-        discount_factors: An optional real `Tensor` of same dtype as the
+        discount_factors: An optional real `ndarray` of same dtype as the
         `volatilities`. If not `None`, these are the discount factors to expiry
         (i.e. e^(-rT)). Mutually exclusive with `discount_rates`. If neither is
         given, no discounting is applied (i.e. the undiscounted option price is
@@ -86,22 +90,20 @@ def option_price(*,
         `discount_rates` and `discount_factors` can be supplied.
         Default value: `None`, which maps to e^(-rT) calculated from
         discount_rates.
-        is_call_options: A boolean `Tensor` of a shape compatible with
+        is_call_options: A boolean `ndarray` of a shape compatible with
         `volatilities`. Indicates whether the option is a call (if True) or a put
         (if False). If not supplied, call options are assumed.
         is_normal_volatility: An optional Python boolean specifying whether the
         `volatilities` correspond to lognormal Black volatility (if False) or
         normal Black volatility (if True).
         Default value: False, which corresponds to lognormal volatility.
-        dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`Tensor` arguments to `Tensor`.
-        Default value: `None` which maps to the default dtype inferred by
-            TensorFlow.
-        name: str. The name for the ops created by this function.
-        Default value: `None` which is mapped to the default name `option_price`.
+        dtype: Optional `jnp.DType`. If supplied, the dtype to be used for conversion
+        of any supplied non-`ndarray` arguments to `ndarray`. Default value: `None`.
+
     Returns:
-        option_prices: A `Tensor` of the same shape as `forwards`. The Black
+        option_prices: A `ndarray` of the same shape as `forwards`. The Black
         Scholes price of the options.
+
     Raises:
         ValueError: If both `forwards` and `spots` are supplied or if neither is
         supplied.
@@ -180,12 +182,17 @@ def barrier_price(*,
                   dtype: jnp.dtype = None
                   ) -> jnp.ndarray:
     """Prices barrier options in a Black-Scholes Model.
+
     Computes the prices of options with a single barrier in Black-Scholes world as
     described in Ref. [1]. Note that the barrier is applied continuously.
+
     #### Example
+
     This example is taken from Ref. [2], Page 154.
+
     ```python
-    import tf_quant_finance as tff
+    import jax_quant_finance as jqf
+
     dtype = np.float32
     discount_rates = np.array([.08, .08])
     dividend_rates = np.array([.04, .04])
@@ -199,67 +206,69 @@ def barrier_price(*,
     is_barrier_down = np.array([True, False])
     is_knock_out = np.array([False, False])
     is_call_option = np.array([True, True])
-    price = tff.black_scholes.barrier_price(
+
+    price = jqf.black_scholes.barrier_price(
     discount_rates, dividend_rates, spots, strikes,
     barriers, rebates, volatilities,
     expiries, is_barrier_down, is_knock_out, is_call_options)
+
     # Expected output
-    #  `Tensor` with values [9.024, 7.7627]
+    #  `ndarray` with values [9.024, 7.7627]
     ```
+
     #### References
+
     [1]: Lee Clewlow, Javier Llanos, Chris Strickland, Caracas Venezuela
     Pricing Exotic Options in a Black-Scholes World, 1994
     https://warwick.ac.uk/fac/soc/wbs/subjects/finance/research/wpaperseries/1994/94-54.pdf
     [2]: Espen Gaarder Haug, The Complete Guide to Option Pricing Formulas,
     2nd Edition, 1997
+
     Args:
-    volatilities: Real `Tensor` of any shape and dtype. The volatilities to
+    volatilities: Real `ndarray` of any shape and dtype. The volatilities to
         expiry of the options to price.
-    strikes: A real `Tensor` of the same dtype and compatible shape as
+    strikes: A real `ndarray` of the same dtype and compatible shape as
         `volatilities`. The strikes of the options to be priced.
-    expiries: A real `Tensor` of same dtype and compatible shape as
+    expiries: A real `ndarray` of same dtype and compatible shape as
         `volatilities`. The expiry of each option. The units should be such that
         `expiry * volatility**2` is dimensionless.
-    spots: A real `Tensor` of any shape that broadcasts to the shape of the
+    spots: A real `ndarray` of any shape that broadcasts to the shape of the
         `volatilities`. The current spot price of the underlying.
-    barriers: A real `Tensor` of same dtype as the `volatilities` and of the
+    barriers: A real `ndarray` of same dtype as the `volatilities` and of the
         shape that broadcasts with `volatilities`. The barriers of each option.
-    rebates: A real `Tensor` of same dtype as the `volatilities` and of the
+    rebates: A real `ndarray` of same dtype as the `volatilities` and of the
         shape that broadcasts with `volatilities`. For knockouts, this is a
         fixed cash payout in case the barrier is breached. For knockins, this is a
         fixed cash payout in case the barrier level is not breached. In the former
         case, the rebate is paid immediately on breach whereas in the latter, the
         rebate is paid at the expiry of the option.
         Default value: `None` which maps to no rebates.
-    discount_rates: A real `Tensor` of same dtype as the
+    discount_rates: A real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`.
         Discount rates, or risk free rates.
         Default value: `None`, equivalent to discount_rate = 0.
-    dividend_rates: A real `Tensor` of same dtype as the
+    dividend_rates: A real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`. A
         continuous dividend rate paid by the underlier. If `None`, then
         defaults to zero dividends.
         Default value: `None`, equivalent to zero dividends.
-    is_barrier_down: A real `Tensor` of `boolean` values and of the shape
+    is_barrier_down: A real `ndarray` of `boolean` values and of the shape
         that broadcasts with `volatilities`. True if barrier is below asset
         price at expiration.
         Default value: `True`.
-    is_knock_out: A real `Tensor` of `boolean` values and of the shape
+    is_knock_out: A real `ndarray` of `boolean` values and of the shape
         that broadcasts with `volatilities`. True if option is knock out
         else false.
         Default value: `True`.
-    is_call_options: A real `Tensor` of `boolean` values and of the shape
+    is_call_options: A real `ndarray` of `boolean` values and of the shape
         that broadcasts with `volatilities`. True if option is call else
         false.
         Default value: `True`.
     dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`Tensor` arguments to `Tensor`.
-        Default value: `None` which maps to the default dtype inferred by
-        TensorFlow.
-    name: str. The name for the ops created by this function.
-        Default value: `None` which is mapped to the default name `barrier_price`.
+        of any supplied non-`ndarray` arguments to `ndarray`.
+        Default value: `None`.
     Returns:
-    option_prices: A `Tensor` of same shape as `spots`. The approximate price of
+    option_prices: A `ndarray` of same shape as `spots`. The approximate price of
     the barriers option under black scholes.
     """
     # The computation is done as in Ref [2] where each integral is split into
@@ -279,7 +288,7 @@ def barrier_price(*,
     else:
         rebates = jnp.zeros_like(spots, dtype=dtype)
 
-    # Convert all to tensor and enforce float dtype where required
+    # Convert all to ndarray and enforce float dtype where required
     if discount_rates is not None:
         discount_rates = jnp.asarray(discount_rates, dtype=dtype)
     else:
@@ -310,8 +319,7 @@ def barrier_price(*,
     # Indices which range from 0-7 are used to select the appropriate
     # mask for each barrier
     indices = jnp.left_shift(is_barrier_down, 2) + jnp.left_shift(
-            is_knock_out, 1) + is_call_options
-    #indices = jnp.multiply(is_barrier_down, 4) + jnp.multiply(is_knock_out, 2) + is_call_options 
+            is_knock_out, 1) + is_call_options 
 
 
     # Masks select the appropriate terms for integral approximations
@@ -425,12 +433,15 @@ def binary_price(*,
                  dtype: jnp.dtype = None
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of binary call or put options.
+
     The binary call (resp. put) option priced here is that which pays off a unit
     of cash if the underlying asset has a value greater (resp. smaller) than the
     strike price at expiry. Hence the binary option price is the discounted
     probability that the asset will end up higher (resp. lower) than the
     strike price at expiry.
+
     #### Example
+
     ```python
     # Price a batch of 5 binary call options.
     volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
@@ -440,7 +451,7 @@ def binary_price(*,
     # Expiries will be broadcast to shape [5], i.e. each option has strike=3
     # and expiry = 1.
     expiries = 1.0
-    computed_prices = tff.black_scholes.binary_price(
+    computed_prices = jqf.black_scholes.binary_price(
         volatilities=volatilities,
         strikes=strikes,
         expiries=expiries,
@@ -448,41 +459,44 @@ def binary_price(*,
     # Expected print output of prices:
     # [0.         0.         0.15865525 0.99764937 0.85927418]
     ```
+
     #### References:
+
     [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
     [2] Wikipedia contributors. Binary option. Available at:
     https://en.wikipedia.org/w/index.php?title=Binary_option
+
     Args:
-    volatilities: Real `Tensor` of any shape and dtype. The volatilities to
+    volatilities: Real `ndarray` of any shape and dtype. The volatilities to
         expiry of the options to price.
-    strikes: A real `Tensor` of the same dtype and compatible shape as
+    strikes: A real `ndarray` of the same dtype and compatible shape as
         `volatilities`. The strikes of the options to be priced.
-    expiries: A real `Tensor` of same dtype and compatible shape as
+    expiries: A real `ndarray` of same dtype and compatible shape as
         `volatilities`. The expiry of each option. The units should be such that
         `expiry * volatility**2` is dimensionless.
-    spots: A real `Tensor` of any shape that broadcasts to the shape of the
+    spots: A real `ndarray` of any shape that broadcasts to the shape of the
         `volatilities`. The current spot price of the underlying. Either this
         argument or the `forwards` (but not both) must be supplied.
-    forwards: A real `Tensor` of any shape that broadcasts to the shape of
+    forwards: A real `ndarray` of any shape that broadcasts to the shape of
         `volatilities`. The forwards to maturity. Either this argument or the
         `spots` must be supplied but both must not be supplied.
-    discount_rates: An optional real `Tensor` of same dtype as the
+    discount_rates: An optional real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`.
         If not `None`, discount factors are calculated as e^(-rT),
         where r are the discount rates, or risk free rates. At most one of
         discount_rates and discount_factors can be supplied.
         Default value: `None`, equivalent to r = 0 and discount factors = 1 when
         discount_factors also not given.
-    dividend_rates: An optional real `Tensor` of same dtype as the
+    dividend_rates: An optional real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`.
         Default value: `None`, equivalent to q = 0.
-    discount_factors: An optional real `Tensor` of same dtype as the
+    discount_factors: An optional real `ndarray` of same dtype as the
         `volatilities`. If not None, these are the discount factors to expiry
         (i.e. e^(-rT)). If None, no discounting is applied (i.e. the undiscounted
         option price is returned). If `spots` is supplied and `discount_factors`
         is not None then this is also used to compute the forwards to expiry.
         Default value: None, equivalent to discount factors = 1.
-    is_call_options: A boolean `Tensor` of a shape compatible with
+    is_call_options: A boolean `ndarray` of a shape compatible with
         `volatilities`. Indicates whether the option is a call (if True) or a put
         (if False). If not supplied, call options are assumed.
     is_normal_volatility: An optional Python boolean specifying whether the
@@ -490,14 +504,13 @@ def binary_price(*,
         normal Black volatility (if True).
         Default value: False, which corresponds to lognormal volatility.
     dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`Tensor` arguments to `Tensor`.
-        Default value: None which maps to the default dtype inferred by TensorFlow
-        (float32).
-    name: str. The name for the ops created by this function.
-        Default value: None which is mapped to the default name `binary_price`.
+        of any supplied non-`ndarray` arguments to `ndarray`.
+        Default value: None.
+
     Returns:
-    binary_prices: A `Tensor` of the same shape as `forwards`. The Black
+    binary_prices: A `ndarray` of the same shape as `forwards`. The Black
     Scholes price of the binary options.
+
     Raises:
     ValueError: If both `forwards` and `spots` are supplied or if neither is
         supplied.
@@ -567,9 +580,12 @@ def asset_or_nothing_price(*,
                             dtype: jnp.dtype = None
                             ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of asset-or-nothing options.
+
     The asset-or-nothing call (resp. put) pays out one unit of the underlying
     asset if the spot is above (resp. below) the strike at maturity.
+
     #### Example
+
     ```python
     # Price a batch of 5 asset_or_nothing call and put options.
     volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
@@ -579,7 +595,7 @@ def asset_or_nothing_price(*,
     # Expiries will be broadcast to shape [5], i.e. each option has strike=3
     # and expiry = 1.
     expiries = 1.0
-    computed_prices = tff.black_scholes.asset_or_nothing_price(
+    computed_prices = jqf.black_scholes.asset_or_nothing_price(
         volatilities=volatilities,
         strikes=strikes,
         expiries=expiries,
@@ -587,33 +603,36 @@ def asset_or_nothing_price(*,
     # Expected print output of prices:
     # [0., 2., 2.52403424, 3.99315108, 4.65085383]
     ```
+
     #### References:
+
     [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
     [2] https://en.wikipedia.org/wiki/Binary_option#Asset-or-nothing_call
+
     Args:
-    volatilities: Real `Tensor` of any shape and dtype. The volatilities to
+    volatilities: Real `ndarray` of any shape and dtype. The volatilities to
         expiry of the options to price.
-    strikes: A real `Tensor` of the same dtype and compatible shape as
+    strikes: A real `ndarray` of the same dtype and compatible shape as
         `volatilities`. The strikes of the options to be priced.
-    expiries: A real `Tensor` of same dtype and compatible shape as
+    expiries: A real `ndarray` of same dtype and compatible shape as
         `volatilities`. The expiry of each option.
-    spots: A real `Tensor` of any shape that broadcasts to the shape of the
+    spots: A real `ndarray` of any shape that broadcasts to the shape of the
         `volatilities`. The current spot price of the underlying. Either this
         argument or the `forwards` (but not both) must be supplied.
-    forwards: A real `Tensor` of any shape that broadcasts to the shape of
+    forwards: A real `ndarray` of any shape that broadcasts to the shape of
         `volatilities`. The forwards to maturity. Either this argument or the
         `spots` must be supplied but both must not be supplied.
-    discount_rates: An optional real `Tensor` of same dtype as the
+    discount_rates: An optional real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`. If
         not `None`, discount factors are calculated as e^(-rT), where r are the
         discount rates, or risk free rates. At most one of discount_rates and
         discount_factors can be supplied.
         Default value: `None`, equivalent to r = 0 and discount factors = 1 when
         discount_factors also not given.
-    dividend_rates: An optional real `Tensor` of same dtype as the
+    dividend_rates: An optional real `ndarray` of same dtype as the
         `volatilities` and of the shape that broadcasts with `volatilities`.
         Default value: `None`, equivalent to q = 0.
-    discount_factors: An optional real `Tensor` of same dtype as the
+    discount_factors: An optional real `ndarray` of same dtype as the
         `volatilities`. If not `None`, these are the discount factors to expiry
         (i.e. e^(-rT)). Mutually exclusive with discount_rates. If neither is
         given, no discounting is applied (i.e. the undiscounted option price is
@@ -622,7 +641,7 @@ def asset_or_nothing_price(*,
         `discount_rates` and `discount_factors` can be supplied.
         Default value: `None`, which maps to e^(-rT) calculated from
         discount_rates.
-    is_call_options: A boolean `Tensor` of a shape compatible with
+    is_call_options: A boolean `ndarray` of a shape compatible with
         `volatilities`. Indicates whether the option is a call (if True) or a put
         (if False). If not supplied, call options are assumed.
     is_normal_volatility: An optional Python boolean specifying whether the
@@ -630,15 +649,13 @@ def asset_or_nothing_price(*,
         normal Black volatility (if True).
         Default value: False, which corresponds to lognormal volatility.
     dtype: Optional `tf.DType`. If supplied, the dtype to be used for conversion
-        of any supplied non-`Tensor` arguments to `Tensor`.
-        Default value: `None` which maps to the default dtype inferred by
-        TensorFlow.
-    name: str. The name for the ops created by this function.
-        Default value: `None`, which is mapped to the default name
-        `asset_or_nothing_price`.
+        of any supplied non-`ndarray` arguments to `ndarray`.
+        Default value: `None`.
+
     Returns:
-    option_prices: A `Tensor` of the same shape as `forwards`. The Black
+    option_prices: A `ndarray` of the same shape as `forwards`. The Black
     Scholes price of the options.
+
     Raises:
     ValueError: If both `forwards` and `spots` are supplied or if neither is
         supplied.
@@ -715,6 +732,7 @@ def swaption_price(*,
                    dtype: jnp.dtype = jnp.float64
                    ) -> jnp.ndarray:
     """Calculates the price of European Swaptions using the Black model.
+
     A European Swaption is a contract that gives the holder an option to enter a
     swap contract at a future date at a prespecified fixed rate. A swaption that
     grants the holder to pay fixed rate and receive floating rate is called a
@@ -722,14 +740,18 @@ def swaption_price(*,
     pay floating payments is called the receiver swaption. Typically the start
     date (or the inception date) of the swap coincides with the expiry of the
     swaption.
+
     #### Example
     The example shows how value a batch of 1y x 1y and 1y x 2y swaptions using the
     Black (normal) model for the swap rate.
+
     ````python
     import numpy as np
-    import tensorflow.compat.v2 as tf
-    import tf_quant_finance as tff
-    dtype = tf.float64
+    import jax.numpy as jnp
+    import jax_quant_finance as jqf
+
+    dtype = jnp.float64
+
     volatilities = [0.01, 0.005]
     expiries = [1.0, 1.0]
     float_leg_start_times = [[1.0, 1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0],
@@ -747,7 +769,7 @@ def swaption_price(*,
     fixed_leg_coupon = [0.011, 0.011]
     discount_fn = lambda x: np.exp(-0.01 * np.array(x))
     price = self.evaluate(
-    tff.black_scholes.swaption_price(
+    jqf.black_scholes.swaption_price(
         volatilities=volatilities,
         expiries=expiries,
         floating_leg_start_times=float_leg_start_times,
@@ -767,60 +789,58 @@ def swaption_price(*,
         dtype=dtype))
     # Expected value: [0.3458467885511461, 0.3014786656395892] # shape = (2,)
     ````
+
     Args:
-    volatilities: Real `Tensor` of any shape and dtype. The Black volatilities
+    volatilities: Real `ndarray` of any shape and dtype. The Black volatilities
         of the swaptions to price. The shape of this input determines the number
         (and shape) of swaptions to be priced and the shape of the output.
-    expiries: A real `Tensor` of same shape and dtype as `volatilities`. The
+    expiries: A real `ndarray` of same shape and dtype as `volatilities`. The
         time to expiration of the swaptions.
-    floating_leg_start_times: A real `Tensor` of the same dtype as
+    floating_leg_start_times: A real `ndarray` of the same dtype as
         `volatilities`. The times when accrual begins for each payment in the
         floating leg. The shape of this input should be `expiries.shape + [m]` or
         `batch_shape + [m]` where `m` denotes the number of floating payments in
         each leg.
-    floating_leg_end_times: A real `Tensor` of the same dtype as `volatilities`.
+    floating_leg_end_times: A real `ndarray` of the same dtype as `volatilities`.
         The times when accrual ends for each payment in the floating leg. The
         shape of this input should be `batch_shape + [m]` where `m` denotes
         the number of floating payments in each leg.
-    fixed_leg_payment_times: A real `Tensor` of the same dtype as
+    fixed_leg_payment_times: A real `ndarray` of the same dtype as
         `volatilities`.  The payment times for each payment in the fixed leg.
         The shape of this input should be `batch_shape + [n]` where `n` denotes
         the number of fixed payments in each leg.
-    floating_leg_daycount_fractions: A real `Tensor` of the same dtype and
+    floating_leg_daycount_fractions: A real `ndarray` of the same dtype and
         compatible shape as `floating_leg_start_times`. The daycount fractions
         for each payment in the floating leg.
-    fixed_leg_daycount_fractions: A real `Tensor` of the same dtype and
+    fixed_leg_daycount_fractions: A real `ndarray` of the same dtype and
         compatible shape as `fixed_leg_payment_times`. The daycount fractions
         for each payment in the fixed leg.
-    fixed_leg_coupon: A real `Tensor` of the same dtype and shape compatible
+    fixed_leg_coupon: A real `ndarray` of the same dtype and shape compatible
         to `batch_shape`. The fixed coupon rate for each payment in the fixed leg.
-    floating_leg_start_times_discount_factors: A real `Tensor` of the same
+    floating_leg_start_times_discount_factors: A real `ndarray` of the same
         shape and dtype as `floating_leg_start_times`. The discount factors
         corresponding to `floating_leg_start_times`.
-    floating_leg_end_times_discount_factors: A real `Tensor` of the same
+    floating_leg_end_times_discount_factors: A real `ndarray` of the same
         shape and dtype as `floating_leg_end_times`. The discount factors
         corresponding to `floating_leg_end_times`.
-    fixed_leg_payment_times_discount_factors: A real `Tensor` of the same
+    fixed_leg_payment_times_discount_factors: A real `ndarray` of the same
         shape and dtype as `fixed_leg_payment_times`. The discount factors
         corresponding to `fixed_leg_payment_times`.
-    notional: An optional `Tensor` of same dtype and compatible shape as
+    notional: An optional `ndarray` of same dtype and compatible shape as
         `volatilities` specifying the notional amount for the underlying swap.
         Default value: None in which case the notional is set to 1.
-    is_payer_swaption: A boolean `Tensor` of a shape compatible with `expiries`.
+    is_payer_swaption: A boolean `ndarray` of a shape compatible with `expiries`.
         Indicates whether the swaption is a payer (if True) or a receiver
         (if False) swaption. If not supplied, payer swaptions are assumed.
     is_normal_volatility: An optional Python boolean specifying whether the
         `volatilities` correspond to normal Black volatility (if True) or
         lognormal Black volatility (if False).
         Default value: True, which corresponds to normal volatility.
-    dtype: The default dtype to use when converting values to `Tensor`s.
-        Default value: `None` which means that default dtypes inferred by
-        TensorFlow are used.
-    name: Python string. The name to give to the ops created by this function.
-        Default value: `None` which maps to the default name
-        `hw_swaption_price`.
+    dtype: The default dtype to use when converting values to `ndarray`s.
+        Default value: `None`.
+
     Returns:
-    A `Tensor` of real dtype and shape `batch_shape` containing the
+    A `ndarray` of real dtype and shape `batch_shape` containing the
     computed swaption prices.
     """    
     volatilities = jnp.asarray(volatilities, dtype=dtype)
