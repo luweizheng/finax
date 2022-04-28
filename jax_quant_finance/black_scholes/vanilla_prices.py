@@ -419,6 +419,7 @@ def barrier_price(*,
     # Calculating and returning price for each option
     return jnp.sum(masks * terms_mat * cdf_mat, axis=strike_rank)
 
+#名字考虑改成cash_or_nothing_price
 def binary_price(*,
                  volatilities: Union[jnp.ndarray, np.ndarray],
                  strikes: Union[jnp.ndarray, np.ndarray],
@@ -704,7 +705,7 @@ def asset_or_nothing_price(*,
         undiscounted_calls = jnp.where(
             sqrt_var > 0.0,
             forwards * ncdf(d1) +
-            sqrt_var * jnp.exp(-0.5 * d1**2) / jnp.sqrt(2 * 3.14159265),
+            sqrt_var * jnp.exp(-0.5 * d1**2) / np.sqrt(2 * np.pi),
             jnp.where(forwards > strikes, forwards, 0.))
 
     if is_call_options is None:
