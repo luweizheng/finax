@@ -463,15 +463,15 @@ class VanillaPrice(jtu.JaxTestCase):
     #                                                     expiries, forwards,
     #                                                     is_call, is_normal):
     #     """Tests that the gradient exists, and is also right-continuous."""
-    #     dtype = tf.float64
-    #     vol = tf.convert_to_tensor(vol, dtype=dtype)
-    #     strikes = tf.convert_to_tensor(strikes, dtype=dtype)
-    #     expiries = tf.convert_to_tensor(expiries, dtype=dtype)
-    #     forwards = tf.convert_to_tensor(forwards, dtype=dtype)
+    #     dtype = jnp.float64
+    #     vol = jnp.asarray(vol, dtype=dtype)
+    #     strikes = jnp.asarray(strikes, dtype=dtype)
+    #     expiries = jnp.asarray(expiries, dtype=dtype)
+    #     forwards = jnp.asarray(forwards, dtype=dtype)
 
     #     with tf.GradientTape(persistent=True) as tape:
     #     tape.watch([vol, strikes, expiries, forwards])
-    #     price = tff.black_scholes.option_price(
+    #     price = jqf.black_scholes.option_price(
     #         volatilities=vol,
     #         strikes=strikes,
     #         expiries=expiries,
