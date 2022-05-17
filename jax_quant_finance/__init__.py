@@ -46,6 +46,7 @@ from jax_quant_finance import math
 from jax_quant_finance import models
 from jax_quant_finance import utils
 from jax_quant_finance import rates
+from jax_quant_finance import experimental
 # from tf_quant_finance import math
 # from tf_quant_finance import models
 # from tf_quant_finance import utils

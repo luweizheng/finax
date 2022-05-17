@@ -1,7 +1,5 @@
 import jax.numpy  as jnp
-
 from jax.lax import linalg
-
 from jax_quant_finance.experimental.pde.steppers.parabolic_equation_stepper import parabolic_equation_step
 
 
@@ -53,11 +51,9 @@ def weighted_implicit_explicit_step(theta):
         inner_second_order_coeff_fn,
         inner_first_order_coeff_fn,
         num_steps_performed,
-        dtype=None,
-        name=None):
+        dtype=None):
         """Performs the step."""
         del num_steps_performed
-        name = name or 'weighted_implicit_explicit_scheme'
         return parabolic_equation_step(time,
                                     next_time,
                                     coord_grid,
@@ -69,8 +65,7 @@ def weighted_implicit_explicit_step(theta):
                                     inner_second_order_coeff_fn,
                                     inner_first_order_coeff_fn,
                                     time_marching_scheme=scheme,
-                                    dtype=dtype,
-                                    name=name)
+                                    dtype=dtype)
     return step_fn
 
 
@@ -184,8 +179,8 @@ def _weighted_scheme_explicit_part(vec, diag, upper, lower, theta, t1, t2):
     # Multiply the tridiagonal matrix by the vector.
     diag_part = diag * vec
     zeros = jnp.zeros_like(lower[..., :1])
-    lower_part = jnp.concat((zeros, lower[..., 1:] * vec[..., :-1]), axis=-1)
-    upper_part = jnp.concat((upper[..., :-1] * vec[..., 1:], zeros), axis=-1)
+    lower_part = jnp.concatenate((zeros, lower[..., 1:] * vec[..., :-1]), axis=-1)
+    upper_part = jnp.concatenate((upper[..., :-1] * vec[..., 1:], zeros), axis=-1)
     return lower_part + diag_part + upper_part
 
 
@@ -217,8 +212,7 @@ def _weighted_scheme_implicit_part(vec, diag, upper, lower, theta, t1, t2):
     diag = 1 + multiplier * diag
     upper = multiplier * upper
     lower = multiplier * lower
-    return linalg.tridiagonal_solve(lower, diag, upper,
-                                        vec)
+    return linalg.tridiagonal_solve(lower, diag, upper, vec)
 
 
 __all__ = [
