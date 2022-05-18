@@ -15,7 +15,8 @@ LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"
 
 INSTALL_REQUIRES = ['numpy', 'jax>=0.3.4', 'jaxlib>=0.3.2']
-TESTS_REQUIRES = ['pytest']
+DOCS_REQUIRES = ['sphinx>=3', 'sphinx-book-theme', 'sphinx-remove-toctrees', 
+    'nbsphinx', 'sphinx-autodoc-typehints', 'sphinx-copybutton', 'docutils']
 
 setup(
     name=PACKAGE_NAME,
@@ -29,8 +30,7 @@ setup(
     url=URL,
     install_requires=INSTALL_REQUIRES,
     extras_require={
-        'tests': TESTS_REQUIRES,
-        'complete': INSTALL_REQUIRES + TESTS_REQUIRES,
+        'dev': INSTALL_REQUIRES + DOCS_REQUIRES,
     },
     packages=find_packages(),
     python_requires='>=3'
