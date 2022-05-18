@@ -9,21 +9,19 @@ from jax import random
 class RandomType(enum.Enum):
     """Types of random number sequences.
 
-    * `PSEUDO`: The standard MindSpore random generator.
-    * `PSEUDO_ANTITHETIC`: PSEUDO random numbers along with antithetic variates.
+    * `STATELESS`: The standard JAX random generator.
+    * `STATELESS_ANTITHETIC`: PSEUDO random numbers along with antithetic variates.
     * `HALTON`: The standard Halton sequence.
     * `HALTON_RANDOMIZED`: The randomized Halton sequence.
     * `SOBOL`: The standard Sobol sequence.
 
     """
 
-    PSEUDO = 0
-    PSEUDO_ANTITHETIC = 1
-    STATELESS = 2
-    STATELESS_ANTITHETIC = 3
-    HALTON = 4
-    HALTON_RANDOMIZED = 5
-    SOBOL = 6
+    STATELESS = 0
+    STATELESS_ANTITHETIC = 1
+    # HALTON = 2
+    # HALTON_RANDOMIZED = 3
+    # SOBOL = 4
 
 
 def normal_pseudo(sample_shape,
