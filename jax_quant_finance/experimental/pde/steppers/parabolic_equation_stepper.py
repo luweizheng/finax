@@ -1,6 +1,5 @@
 import jax.numpy as jnp
-from numpy import broadcast
-from optax import lamb
+
 
 def parabolic_equation_step(
     time, 
@@ -13,7 +12,7 @@ def parabolic_equation_step(
     zeroth_order_coeff_fn,
     inner_second_order_coeff_fn,
     inner_first_order_coeff_fn,
-    time_maching_scheme,
+    time_marching_scheme,
     dtype=None):
     
     time = jnp.asarray(time, dtype=dtype)
@@ -39,6 +38,7 @@ def parabolic_equation_step(
     inner_grid_in = value_grid[..., lower_index:upper_index]
     coord_grid_deltas = coord_grid[0][1:] - coord_grid[0][:-1]
     
+    
     def equation_params_fn(t):
         return _construct_space_discretized_eqn_params(
                 coord_grid, coord_grid_deltas, value_grid, boundary_conditions,
@@ -46,7 +46,7 @@ def parabolic_equation_step(
                 second_order_coeff_fn, first_order_coeff_fn, zeroth_order_coeff_fn,
                 inner_second_order_coeff_fn, inner_first_order_coeff_fn, t)
     
-    inner_grid_out = time_maching_scheme(
+    inner_grid_out = time_marching_scheme(
         value_grid=inner_grid_in,
         t1=time,
         t2=next_time,
@@ -94,7 +94,7 @@ def _construct_space_discretized_eqn_params(
     
     second_order_coeff_fn = second_order_coeff_fn or (lambda *args: [[None]])
     first_order_coeff_fn = first_order_coeff_fn or (lambda *args: [[None]])
-    zeroth_order_coeff_fn  = zeroth_order_coeff_fn or (lambda *args: [[None]])
+    zeroth_order_coeff_fn  = zeroth_order_coeff_fn or (lambda *args: None)
     inner_second_order_coeff_fn = inner_second_order_coeff_fn or (lambda *args: [[None]])
     inner_first_order_coeff_fn = inner_first_order_coeff_fn or (lambda *args: [[None]])
     
@@ -160,9 +160,7 @@ def _construct_space_discretized_eqn_params(
     subdiag = subdiag_first_order + subdiag_second_order
     diag = diag_zeroth_order + diag_first_order + diag_second_order    
     
-    (subdiag, diag, superdiag) = _apply_default_boundary(subdiag, 
-                                                         diag, 
-                                                         superdiag,
+    (subdiag, diag, superdiag) = _apply_default_boundary(subdiag, diag, superdiag,
                                                          zeroth_order_coeff,
                                                          inner_first_order_coeff,
                                                          first_order_coeff,
@@ -191,7 +189,6 @@ def _apply_default_boundary(subdiag, diag, superdiag,
                             has_default_lower_boundary,
                             has_default_upper_boundary):
 
-        
     batch_shape = diag.shape[:-1]
     if zeroth_order_coeff is None:
         zeroth_order_coeff = jnp.zeros([1], dtype=diag.dtype)
@@ -205,6 +202,7 @@ def _apply_default_boundary(subdiag, diag, superdiag,
                                                                    first_order_coeff,
                                                                    forward_deltas,
                                                                    batch_shape)
+        
     if has_default_upper_boundary:
         (subdiag, diag, superdiag) = _apply_default_upper_boundary(subdiag, 
                                                                    diag,
@@ -214,8 +212,9 @@ def _apply_default_boundary(subdiag, diag, superdiag,
                                                                    first_order_coeff,
                                                                    backward_deltas,
                                                                    batch_shape)
-        
-        return subdiag ,diag, superdiag        
+    
+       
+    return subdiag ,diag, superdiag        
         
         
 
@@ -251,6 +250,8 @@ def _apply_default_lower_boundary(subdiag, diag, superdiag,
     
     diag = _append_first(-extra_diag_coeff, diag)
     subdiag = _append_first(jnp.zeros_like(extra_diag_coeff), subdiag)
+    
+    print(subdiag, diag, superdiag)
     
     return subdiag, diag, superdiag
 
@@ -434,7 +435,6 @@ def _prepare_pde_coeffs(raw_coeffs, value_grid):
     coeffs = jnp.asarray(raw_coeffs, dtype=dtype)
     broadcast_shape = value_grid.shape
     coeffs = jnp.broadcast_to(coeffs, broadcast_shape)
-    
     return coeffs
     
 
