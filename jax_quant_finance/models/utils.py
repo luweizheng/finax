@@ -82,7 +82,7 @@ def prepare_grid(*, times, time_step, dtype, tolerance=None,
 
 def _grid_from_time_step(*, times, time_step, dtype, tolerance):
     """Creates a time grid from an input time step."""
-    grid = jnp.arange(0.0, times[-1], time_step, dtype=dtype)
+    grid = jnp.arange(start=0.0, stop=times[-1], step=time_step, dtype=dtype)
     all_times = jnp.concatenate([times, grid], axis=0)
     all_times = jnp.sort(all_times)
 
@@ -111,8 +111,10 @@ def _grid_from_num_times(*, times, time_step, num_time_steps):
     # Build a uniform grid for the timestep of size
     # max(0, num_time_steps - tf.shape(times)[0])
     uniform_grid = jnp.linspace(
-        time_step, times[-1] - time_step,
-        jnp.maximum(num_time_steps - times.shape[0], 0))
+            start=time_step, 
+            stop=times[-1] - time_step,
+            num=jnp.asarray(jnp.maximum(num_time_steps - times.shape[0], 0), jnp.int32)
+        )
     grid = jnp.sort(jnp.concatenate([uniform_grid, times], axis=0))
     # Add zero to the time grid
     all_times = jnp.concatenate([jnp.asarray([0]), grid], axis=0)

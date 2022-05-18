@@ -5,16 +5,17 @@ from functools import partial
 
 import numpy as np
 
-from jax import lax, jit, vmap
+import jax
+from jax import lax, jit, vmap, pmap, local_device_count
 import jax.numpy as jnp
 from jax import random
 
 from jax_quant_finance.math import random_sampler
 from jax_quant_finance.models import utils
+from jax_quant_finance.utils import ParallelType, LoopType
 
 
 def sample(
-    batch_size: int,
     dim: int,
     drift_fn: Callable[..., jnp.ndarray],
     volatility_fn: Callable[..., jnp.ndarray],
@@ -28,6 +29,8 @@ def sample(
     times_grid: Optional[Union[jnp.ndarray, np.ndarray]] = None,
     validate_args: bool = False,
     tolerance: Optional[Union[jnp.ndarray, np.ndarray]] = None,
+    loop_method: Optional[LoopType] = LoopType.WHILE,
+    parallel_mode: Optional[ParallelType] = ParallelType.SINGLE_DEVICE,
     dtype: Optional[jnp.dtype] = None
     ) -> jnp.ndarray:
     """Returns a sample paths from the process using Euler method.
@@ -98,8 +101,6 @@ def sample(
     https://en.wikipedia.org/wiki/Euler-Maruyama_method
 
     Args:
-        batch_size: Python int greater than or equal to 1. Batch Size of independent 
-            stochastic process we want to model.
         dim: Python int greater than or equal to 1. The dimension of the Ito
             Process.
         drift_fn: A Python callable to compute the drift of the process. The
@@ -140,10 +141,9 @@ def sample(
         random_type: Enum value of `RandomType`. The type of (quasi)-random
             number generator to use to generate the paths.
             Default value: None which maps to the JAX's stateless pseudo-random numbers.
-        seed: Seed for the random number generator. The seed is
-        only relevant if `random_type` is one of
-            `[STATELESS, STATELESS_ANTITHETIC]`. 
-            Default value: `None` which means no seed is set.
+        seed: Seed for the random number generator. The seed is only relevant 
+            if `random_type` is one of `[STATELESS, STATELESS_ANTITHETIC]`. 
+            Default value: 0.
         times_grid: An optional rank 1 `ndarray` representing time discretization
             grid. If `times` are not on the grid, then the nearest points from the
             grid are used. When supplied, `num_time_steps` and `time_step` are
@@ -160,12 +160,20 @@ def sample(
             tolerance are perceived to be the same.
             Default value: `None` which maps to `1-e6` if the for single precision
                 `dtype` and `1e-10` for double precision `dtype`.
+        loop_method: An enum to specify which loop method to use: 
+            * `jax_quant_finance.utils.LoopType.WHILE` for `jax.lax.while_loop`
+            `jax_quant_finance.utils.LoopType.SCAN` for `jax.lax.scan`
+            Default value: `LoopType.WHILE`.
+        parallel_mode: An enum to specify which parallelization mode to use: 
+            * `jax_quant_finance.utils.ParallelType.SINGLE_DEIVCE` for single device evaluation.
+            * `jax_quant_finance.utils.ParallelType.MULTI_DEIVCE` for single host multiple devices evaluation.
+            Default value: `ParallelType.SINGLE_DEIVCE`.
         dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
             `ndarray` data type conversion. 
             Default value: `None`. which means that the dtype implied by `times` is used.
 
     Returns:
-        A real `ndarray` of shape (batch_size, len(times), num_samples, dim) 
+        A real `ndarray` of shape (batch_size, num_samples, len(times), dim) 
         where `len(times)` is the size of the `times`.
 
     Raises:
@@ -187,6 +195,19 @@ def sample(
     if initial_state is None:
         initial_state = jnp.zeros(dim, dtype=dtype)
     initial_state = jnp.asarray(initial_state, dtype=dtype)
+
+    # `batch_size` is inferred from `initial_state`
+    # the last axis of `initial_state` is the dim of the process
+    batch_shape = initial_state.shape[:-1]
+    if len(batch_shape) > 1:
+        raise ValueError(
+            'We currently do not support multiple batch shape of `initial_state`.'
+            'The shape of  `initial_state` should be (batch_size, dim) or (dim, ).'
+            )
+    elif len(batch_shape) == 0:
+        # if there is no batch shape in `initial_state`, add a batch axis in initial_state
+        initial_state = jnp.expand_dims(initial_state, axis=0)
+    batch_size = initial_state.shape[0]
 
     # compute the value of every element in times
     num_requested_times = times.shape[0]
@@ -213,7 +234,7 @@ def sample(
 
     # `times` is the times path, which is a 1-D ndarray, 
     #     ranging from 0 to times[-1]] with `num_time_steps` elements
-    #  `keep_masks` has same shape with `times`, it is the mask 
+    # `keep_masks` has same shape with `times`, it is the mask 
     #     indicating which time step should be evaluated as a result, 
     #     0 is for false, 1 is for true
     times, keep_mask, time_indices = utils.prepare_grid(
@@ -224,30 +245,112 @@ def sample(
         tolerance=tolerance,
         dtype=dtype)
 
-    keys = random.PRNGKey(seed)
+    rng = random.PRNGKey(seed)
+    rngs = random.split(rng, num=batch_size)
+    
+    if parallel_mode == ParallelType.SINGLE_DEVICE:
+        paths = single_device_sample(rngs,
+            initial_state,
+            dim, 
+            drift_fn, 
+            volatility_fn, 
+            times, 
+            keep_mask, 
+            num_requested_times, 
+            num_samples,  
+            random_type, 
+            dtype, 
+            loop_method)
+    elif parallel_mode == ParallelType.MULTI_DEVICE:
+        # TODO: now we only support batch_size that is divisible by the number of devices
+        n_local_devices = jax.local_device_count()
+        # add an axis to the front for `pmap` parallelization
+        rngs = rngs.reshape(n_local_devices, batch_size // n_local_devices, 2)
+        initial_state = jnp.reshape(initial_state, (n_local_devices, batch_size // n_local_devices ,dim))
+        
+        paths = multiple_devices_sample(rngs,
+            initial_state,
+            dim, 
+            drift_fn, 
+            volatility_fn, 
+            times, 
+            keep_mask, 
+            num_requested_times, 
+            num_samples, 
+            random_type, 
+            dtype, 
+            loop_method)
+    return paths
 
-    if batch_size > 1:
-        keys = random.split(keys, num=batch_size)
-        sample_fn = vmap(_sample, in_axes=(0, None, None, None, None, None, None, None, 0, None, None, None))
+@partial(pmap, axis_name='device', 
+    static_broadcasted_argnums=[2, 3, 4, 7, 8, 9, 10, 11], 
+    in_axes=(0, 0, None, None, None, None, None, None, None, None, None, None))
+def multiple_devices_sample(
+        keys, 
+        initial_state,
+        dim, 
+        drift_fn, 
+        volatility_fn, 
+        times, 
+        keep_mask, 
+        num_requested_times, 
+        num_samples,
+        random_type, 
+        dtype, 
+        loop_method):
+    """
+    `pmap` on the first axis based on `single_device_sample`
+    """
+    return single_device_sample(
+        keys,
+        initial_state,
+        dim, 
+        drift_fn, 
+        volatility_fn, 
+        times, 
+        keep_mask, 
+        num_requested_times, 
+        num_samples, 
+        random_type, 
+        dtype, 
+        loop_method
+    )
 
-        return sample_fn(keys, dim, drift_fn, volatility_fn, times, keep_mask, num_requested_times, num_samples, initial_state, random_type, dtype, "while")
-    else:
-        sample_fn = _sample
-        return sample_fn(
-            seed=keys,
-            dim=dim,
-            drift_fn=drift_fn,
-            volatility_fn=volatility_fn,
-            times=times,
-            keep_mask=keep_mask,
-            num_requested_times=num_requested_times,
-            num_samples=num_samples,
-            initial_state=initial_state,
-            random_type=random_type,
-            dtype=dtype)
+@partial(vmap, in_axes=(0, 0, None, None, None, None, None, None, None, None, None, None))
+def single_device_sample(
+        keys, 
+        initial_state,
+        dim, 
+        drift_fn, 
+        volatility_fn, 
+        times, 
+        keep_mask, 
+        num_requested_times, 
+        num_samples,
+        random_type, 
+        dtype, 
+        loop_method):
+    """
+    `vmap` on the `batch_size` axis based on `_sample`
+    """
+    return _sample(
+        keys,
+        initial_state,
+        dim, 
+        drift_fn, 
+        volatility_fn, 
+        times, 
+        keep_mask, 
+        num_requested_times, 
+        num_samples, 
+        random_type, 
+        dtype, 
+        loop_method
+    )
 
 
-def _sample(seed,
+def _sample(rng_key,
+            initial_state,
             dim,
             drift_fn,
             volatility_fn,
@@ -255,10 +358,9 @@ def _sample(seed,
             keep_mask,
             num_requested_times,
             num_samples,
-            initial_state,
             random_type,
             dtype,
-            loop_method="while"):
+            loop_method):
     """Returns a sample of paths from the process using Euler method."""
     dt = times[1:] - times[:-1]
     sqrt_dt = jnp.sqrt(dt)
@@ -266,41 +368,53 @@ def _sample(seed,
     steps_num = dt.shape[-1]
     wiener_mean = None
     
-    # TODO: multivariate
+    # TODO: low-discrepancy random_type
+    # TODO: should covar be calculated here or in volatility_fn ?
     # STATELESS random normal
-    if random_type == random_sampler.RandomType.STATELESS_ANTITHETIC:
+    if random_type in [None, random_sampler.RandomType.STATELESS_ANTITHETIC]:
         normal_draws_shape = (steps_num, num_samples // 2, dim)
-        normal_draws = random.normal(key=seed,
+        normal_draws = random.normal(key=rng_key,
                 shape=normal_draws_shape,
                 dtype=dtype)
         normal_draws = jnp.concatenate([normal_draws, -normal_draws], axis=1)
     elif random_type == random_sampler.RandomType.STATELESS:
         normal_draws_shape = (steps_num, num_samples, dim)
-        normal_draws = random.normal(key=seed,
+        normal_draws = random.normal(key=rng_key,
                 shape=normal_draws_shape,
                 dtype=dtype)
-    # low-discrepancy random_type
     
     # create a ndarray to store all these results
     element_shape = current_state.shape
     result = jnp.zeros((num_requested_times, ) + element_shape, dtype=dtype)
-    
-    if loop_method == 'while':
-        while_loop_fn = jit(_while_loop, static_argnames=['drift_fn', 'volatility_fn', 'dtype', 'random_type'])
-        return while_loop_fn(steps_num=steps_num,
+
+    if loop_method == LoopType.WHILE:
+        paths = _while_loop(steps_num=steps_num,
             current_state=current_state,
             drift_fn=drift_fn, volatility_fn=volatility_fn, wiener_mean=wiener_mean,
             num_samples=num_samples, times=times,
             dt=dt, sqrt_dt=sqrt_dt, keep_mask=keep_mask,
             num_requested_times=num_requested_times,
-            random_type=random_type, result=result, normal_draws=normal_draws,
-            dtype=dtype)
+            random_type=random_type, result=result, normal_draws=normal_draws)
+    elif loop_method == LoopType.SCAN:
+        paths = _scan(steps_num=steps_num,
+            current_state=current_state,
+            drift_fn=drift_fn, volatility_fn=volatility_fn, wiener_mean=wiener_mean,
+            num_samples=num_samples, times=times,
+            dt=dt, sqrt_dt=sqrt_dt, keep_mask=keep_mask,
+            num_requested_times=num_requested_times,
+            random_type=random_type, result=result, normal_draws=normal_draws)
+    
+    # (len(times), num_samples, dim) 
+    #   -> 
+    # (num_samples, len(times), dim)
+    paths = paths.transpose(1, 0, 2)
+    return paths
 
-
+@partial(jit, static_argnames=['drift_fn', 'volatility_fn', 'dtype', 'random_type'])
 def _while_loop(*, steps_num, current_state,
                 drift_fn, volatility_fn, wiener_mean,
                 num_samples, times, dt, sqrt_dt, num_requested_times,
-                keep_mask, random_type, result, normal_draws, dtype):
+                keep_mask, random_type, result, normal_draws):
     """Sample paths using `lax.while_loop`."""
     written_count = 0
     result = result.at[written_count].set(current_state)
@@ -312,49 +426,66 @@ def _while_loop(*, steps_num, current_state,
         return jnp.logical_and(i < steps_num, written_count < num_requested_times)
 
     def step_fn(state):
+        """Performs one step of Euler scheme.
+        X_{n+1} = X_{n} + drift_fn() * dt + volatility_fn() * dW
+        """
         i, written_count, current_state, result = state
-        return _euler_step(
-            i=i,
-            written_count=written_count,
-            current_state=current_state,
-            drift_fn=drift_fn,
-            volatility_fn=volatility_fn,
-            wiener_mean=wiener_mean,
-            num_samples=num_samples,
-            times=times,
-            dt=dt,
-            sqrt_dt=sqrt_dt,
-            keep_mask=keep_mask,
-            normal_draws=normal_draws,
-            result=result,
-            )
+        
+        # the first element of `times` is 0 
+        current_time = times[i + 1]
+
+        dw = normal_draws[i]
+        dw = dw * sqrt_dt[i]
+
+        dt_inc = dt[i] * drift_fn(current_time, current_state)
+        dw_inc = jnp.einsum('...ij,...j->...i', volatility_fn(current_time, current_state), dw)
+        
+        next_state = current_state + dt_inc + dw_inc
+        result = result.at[written_count].set(next_state)
+        written_count = lax.add(written_count, keep_mask[i + 1])
+
+        return i+1, written_count, next_state, result
     
     # result of sample paths
     # result shape: (num_requested_times, num_samples, dim)
-    _, _, _, result = lax.while_loop(cond_fn, step_fn, (0, written_count, current_state, result))
+    _, _, _, result = lax.while_loop(cond_fun=cond_fn, 
+            body_fun=step_fn, 
+            init_val=(0, written_count, current_state, result))
    
     return result
 
-
-def _euler_step(*, i, written_count, current_state,
+@partial(jit, static_argnames=['drift_fn', 'volatility_fn', 'dtype', 'random_type'])
+def _scan(*, steps_num, current_state,
                 drift_fn, volatility_fn, wiener_mean,
-                num_samples, times, dt, sqrt_dt, keep_mask,
-                normal_draws, result,
-            ):
-    """Performs one step of Euler scheme.
-    X_{n+1} = X_{n} + drift_fn() * dt + volatility_fn * dW
-    """
-    # the first element of `times` is 0 
-    current_time = times[i + 1]
+                num_samples, times, dt, sqrt_dt, num_requested_times,
+                keep_mask, random_type, result, normal_draws):
+    """Sample paths using `lax.scan`."""
+    written_count = 0
+    result = result.at[written_count].set(current_state)
+    written_count = lax.add(written_count, jnp.asarray(keep_mask[0]))
 
-    dw = normal_draws[i]
-    dw = dw * sqrt_dt[i]
+    def step_fn(carry, normal_draw):
+        """Performs one step of Euler scheme.
+        X_{n+1} = X_{n} + drift_fn() * dt + volatility_fn() * dW
+        """
+        
+        i, written_count, current_state, result = carry
+        current_time = times[i + 1]
+        dw = normal_draw * sqrt_dt[i]
 
-    dt_inc = dt[i] * drift_fn(current_time, current_state)
-    dw_inc = jnp.einsum('...ij,...j->...i', volatility_fn(current_time, current_state), dw)
+        dt_inc = dt[i] * drift_fn(current_time, current_state)
+        dw_inc = jnp.einsum('...ij,...j->...i', volatility_fn(current_time, current_state), dw)
+        
+        next_state = current_state + dt_inc + dw_inc
+        result = result.at[written_count].set(next_state)
+        written_count = lax.add(written_count, keep_mask[i + 1])
+        return (i + 1, written_count, next_state, result), None
     
-    next_state = current_state + dt_inc + dw_inc
-    result = result.at[written_count].set(next_state)
-    written_count = lax.add(written_count, keep_mask[i + 1])
-
-    return i + 1, written_count, next_state, result
+    # result of sample paths
+    # result shape: (num_requested_times, num_samples, dim)
+    (_, _, _, result), _ = lax.scan(f=step_fn,
+            init=(0, written_count, current_state, result),
+            xs=normal_draws
+        )
+   
+    return result
