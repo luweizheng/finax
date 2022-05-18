@@ -21,6 +21,7 @@ def parabolic_equation_step(
     value_grid = jnp.asarray(value_grid, dtype=dtype)
     
     
+    
     if boundary_conditions[0][0] is None:
         has_default_lower_boundary = True
         lower_index = 0
@@ -93,10 +94,10 @@ def _construct_space_discretized_eqn_params(
     sum_deltas = forward_deltas + backward_deltas
     
     second_order_coeff_fn = second_order_coeff_fn or (lambda *args: [[None]])
-    first_order_coeff_fn = first_order_coeff_fn or (lambda *args: [[None]])
+    first_order_coeff_fn = first_order_coeff_fn or (lambda *args: [None])
     zeroth_order_coeff_fn  = zeroth_order_coeff_fn or (lambda *args: None)
     inner_second_order_coeff_fn = inner_second_order_coeff_fn or (lambda *args: [[None]])
-    inner_first_order_coeff_fn = inner_first_order_coeff_fn or (lambda *args: [[None]])
+    inner_first_order_coeff_fn = inner_first_order_coeff_fn or (lambda *args: [None])
     
     second_order_coeff = _prepare_pde_coeffs(
         second_order_coeff_fn(t, coord_grid)[0][0], value_grid)
@@ -110,14 +111,12 @@ def _construct_space_discretized_eqn_params(
         inner_first_order_coeff_fn(t, coord_grid)[0], value_grid)
     
     zeros = jnp.zeros_like(value_grid[...,1:-1])
-    
   # Discretize zeroth-order term.
     if zeroth_order_coeff is None:
         diag_zeroth_order = zeros
     else:
         # Minus is due to moving to rhs.
         diag_zeroth_order = -zeroth_order_coeff[..., 1:-1]
-
     # Discretize first-order term.
     if first_order_coeff is None and inner_first_order_coeff is None:
         # No first-order term.
@@ -136,7 +135,6 @@ def _construct_space_discretized_eqn_params(
             superdiag_first_order *= inner_first_order_coeff[..., 2:]
             subdiag_first_order *= inner_first_order_coeff[..., :-2]
             diag_first_order *= inner_first_order_coeff[..., 1:-1]
-
     # Discretize second-order term.
     if second_order_coeff is None and inner_second_order_coeff is None:
         # No second-order term.
@@ -155,11 +153,9 @@ def _construct_space_discretized_eqn_params(
             superdiag_second_order *= inner_second_order_coeff[..., 2:]
             subdiag_second_order *= inner_second_order_coeff[..., :-2]
             diag_second_order *= inner_second_order_coeff[..., 1:-1]
-
     superdiag = superdiag_first_order + superdiag_second_order
     subdiag = subdiag_first_order + subdiag_second_order
     diag = diag_zeroth_order + diag_first_order + diag_second_order    
-    
     (subdiag, diag, superdiag) = _apply_default_boundary(subdiag, diag, superdiag,
                                                          zeroth_order_coeff,
                                                          inner_first_order_coeff,
@@ -250,8 +246,7 @@ def _apply_default_lower_boundary(subdiag, diag, superdiag,
     
     diag = _append_first(-extra_diag_coeff, diag)
     subdiag = _append_first(jnp.zeros_like(extra_diag_coeff), subdiag)
-    
-    print(subdiag, diag, superdiag)
+
     
     return subdiag, diag, superdiag
 

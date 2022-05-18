@@ -1,5 +1,4 @@
 from time import time
-from jax_quant_finance.experimental.pde.steppers.explicit import explicit_step
 import numpy as np
 import jax_quant_finance as jqf
 import jax.numpy as jnp
