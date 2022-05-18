@@ -17,9 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'Jax-Quant-Finance'
-copyright = '2022, Weizheng Lu'
-author = 'Weizheng Lu'
+project = u'Jax-Quant-Finance'
+copyright = u'2022, Jax-Quant-Finance Authors'
+author = u'The JAX-QUANT-FINANCE Authors'
 
 # The full version, including alpha/beta/rc tags
 release = ''
