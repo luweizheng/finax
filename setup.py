@@ -4,13 +4,12 @@ from setuptools import setup, find_packages
 HERE = pathlib.Path(__file__).parent
 
 VERSION = '0.0.1'
-PACKAGE_NAME = 'jax-quant-finance'
-AUTHOR = 'luweizheng'
-AUTHOR_EMAIL = 'luweizheng36@hotmail.com'
-URL = 'https://github.com/luweizheng/jax-quant-finance'
+PACKAGE_NAME = 'finax'
+AUTHOR = 'The Finax Authors'
+URL = 'https://github.com/luweizheng/finax'
 
-LICENSE = 'GPLv3'
-DESCRIPTION = 'High Performance Quantative Finance Library on JAX'
+LICENSE = 'MIT'
+DESCRIPTION = 'High Performance Quantative Finance Library'
 LONG_DESCRIPTION = (HERE / "README.md").read_text()
 LONG_DESC_TYPE = "text/markdown"
 
@@ -25,7 +24,6 @@ setup(
     long_description_content_type=LONG_DESC_TYPE,
     author=AUTHOR,
     license=LICENSE,
-    author_email=AUTHOR_EMAIL,
     url=URL,
     install_requires=INSTALL_REQUIRES,
     extras_require={

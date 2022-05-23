@@ -1,9 +1,11 @@
-# JAX-Quant-Finance: High Performance Quantative Finance on JAX
+# Finax: High Performance Quantative Finance on JAX
 
 ## Introduction
 
-Inspired by [TF Quant Finance](https://github.com/google/tf-quant-finance), we developed a quantative finance library based on [JAX](https://github.com/google/jax). This library provides high-performance financial computation leveraging the hardware
-acceleration, parallel scientific computing and automatic differentiation of JAX. 
+We developed a quantative finance library based on [JAX](https://github.com/google/jax). This library provides high-performance financial computation leveraging the hardware
+acceleration, parallel scientific computing and automatic differentiation of JAX.
+
+Finax is still a research project that is currently under development. Some APIs may change in the future. We welcome any suggestions and contributions.
 
 We can:
 
@@ -11,9 +13,9 @@ We can:
 
 * calculate mathematical derivative of financial models, i.e. Greeks
 
-* distribute workloads on multiple devices and machines
+* distribute workloads on multiple devices
 
-`examples` directory contains several demonstrations of using the JAX-Quant-Finance.
+`examples` directory contains several demonstrations of using our Finax library.
 
 ## Install
 
@@ -21,10 +23,10 @@ We can:
 
 You must first follow [JAX's installation guide](https://github.com/google/jax/#installation) to install JAX based on your device architecture (CPU/GPU/TPU).
 
-### JAX-Quant-Finance
+### Finax
 
 ```
-pip install jax-quant-finance --upgrade
+pip install finax --upgrade
 ```
 
 ## Usage
@@ -40,7 +42,7 @@ from jax import jit
 from jax.config import config
 config.update("jax_enable_x64", True)
 
-from jax_quant_finance.black_sholes.vanilla_prices import option_price
+from finax.black_sholes.vanilla_prices import option_price
 
 option_price_fn = jit(option_price)
 
@@ -59,7 +61,7 @@ computed_prices = option_price_fn(
 
 ### 64-bit precision
 
-To enable 64-bit precision, set the respective JAX flag _before_ importing `jax_quant_finance` (see the JAX [guide](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#double-64bit-precision)), for example:
+To enable 64-bit precision, set the respective JAX flag _before_ importing `finax` (see the JAX [guide](https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#double-64bit-precision)), for example:
 
 ```python
 from jax.config import config
