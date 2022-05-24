@@ -60,6 +60,9 @@ pygments_style = None
 autosummary_generate = True
 napolean_use_rtype = False
 
+# Render Order
+autodoc_member_order = 'bysource'
+
 
 # -- Options for HTML output -------------------------------------------------
 
