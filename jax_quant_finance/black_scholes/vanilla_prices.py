@@ -31,30 +31,29 @@ def option_price(*,
                  dtype: jnp.dtype = None
                  ) -> jnp.ndarray:
     """Computes the Black Scholes price for a batch of call or put options.
+    
+    Provide basic Black Scholes price method.
+    
+    Example:
+        ::
+        
+            # Price a batch of 5 vanilla call options.
+            volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+            forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+            # Strikes will automatically be broadcasted to shape [5].
+            strikes = np.array([3.0])
+            # Expiries will be broadcast to shape [5], i.e. each option has strike=3
+            # and expiry = 1.
+            expiries = 1.0
+            computed_prices = jqf.black_scholes.option_price(volatilities=volatilities,strikes=strikes,expiries=expiries,forwards=forwards)
+            # Expected print output of computed prices:
+            # [ 0. ,2. ,2.04806848 ,1.00020297 ,2.07303131]
 
-    #### Example
-
-    ```python
-    # Price a batch of 5 vanilla call options.
-    volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
-    forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    # Strikes will automatically be broadcasted to shape [5].
-    strikes = np.array([3.0])
-    # Expiries will be broadcast to shape [5], i.e. each option has strike=3
-    # and expiry = 1.
-    expiries = 1.0
-    computed_prices = jqf.black_scholes.option_price(
-        volatilities=volatilities,
-        strikes=strikes,
-        expiries=expiries,
-        forwards=forwards)
-    # Expected print output of computed prices:
-    # [ 0.          2.          2.04806848  1.00020297  2.07303131]
-    ```
-
-    #### References:
-    [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
-    [2] Wikipedia contributors. Black-Scholes model. Available at:
+    
+    References:
+        [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
+        
+        [2] Wikipedia contributors. Black-Scholes model. Available at: 
         https://en.wikipedia.org/w/index.php?title=Black%E2%80%93Scholes_model
 
     Args:
@@ -72,7 +71,7 @@ def option_price(*,
             `spots` must be supplied but both must not be supplied.
         discount_rates: An optional real `ndarray` of same dtype as the
             `volatilities` and of the shape that broadcasts with `volatilities`.
-            If not `None`, discount factors are calculated as e^(-rT),
+            If not `None`, discount factors are calculated as $e^{-rT}$,
             where r are the discount rates, or risk free rates. At most one of
             `discount_rates` and `discount_factors` can be supplied.
             Default value: `None`, equivalent to r = 0 and discount factors = 1 when
@@ -88,7 +87,7 @@ def option_price(*,
             then this is also used to compute the forwards to expiry. At most one of
             `discount_rates` and `discount_factors` can be supplied.
             Default value: `None`, which maps to e^(-rT) calculated from
-             discount_rates.
+            discount_rates.
         is_call_options: A boolean `ndarray` of a shape compatible with
             `volatilities`. Indicates whether the option is a call (if True) or a put
             (if False). If not supplied, call options are assumed.
@@ -101,8 +100,7 @@ def option_price(*,
             Default value: `None`.
 
     Returns:
-        option_prices: A `ndarray` of the same shape as `forwards`. The Black
-            Scholes price of the options.
+        option_prices: A `ndarray` of the same shape as `forwards`. The Black Scholes price of the options.
 
     Raises:
         ValueError: If both `forwards` and `spots` are supplied or if neither is supplied.
@@ -185,43 +183,42 @@ def barrier_price(*,
     Computes the prices of options with a single barrier in Black-Scholes world as
     described in Ref. [1]. Note that the barrier is applied continuously.
 
-    #### Example
+    Example:
 
-    This example is taken from Ref. [2], Page 154.
+        This example is taken from Ref. [2], Page 154::
 
-    ```python
-    import jax_quant_finance as jqf
 
-    dtype = np.float32
-    discount_rates = np.array([.08, .08])
-    dividend_rates = np.array([.04, .04])
-    spots = np.array([100., 100.])
-    strikes = np.array([90., 90.])
-    barriers = np.array([95. 95.])
-    rebates = np.array([3. 3.])
-    volatilities = np.array([.25, .25])
-    expiries = np.array([.5, .5])
-    barriers_type = np.array([5, 1])
-    is_barrier_down = np.array([True, False])
-    is_knock_out = np.array([False, False])
-    is_call_option = np.array([True, True])
+            import jax_quant_finance as jqf
 
-    price = jqf.black_scholes.barrier_price(
-    discount_rates, dividend_rates, spots, strikes,
-    barriers, rebates, volatilities,
-    expiries, is_barrier_down, is_knock_out, is_call_options)
+            dtype = np.float32
+            discount_rates = np.array([.08, .08])
+            dividend_rates = np.array([.04, .04])
+            spots = np.array([100., 100.])
+            strikes = np.array([90., 90.])
+            barriers = np.array([95. 95.])
+            rebates = np.array([3. 3.])
+            volatilities = np.array([.25, .25])
+            expiries = np.array([.5, .5])
+            barriers_type = np.array([5, 1])
+            is_barrier_down = np.array([True, False])
+            is_knock_out = np.array([False, False])
+            is_call_option = np.array([True, True])
 
-    # Expected output
-    #  `ndarray` with values [9.024, 7.7627]
-    ```
+            price = jqf.black_scholes.barrier_price(
+            discount_rates, dividend_rates, spots, strikes,
+            barriers, rebates, volatilities,
+            expiries, is_barrier_down, is_knock_out, is_call_options)
 
-    #### References
+            # Expected output
+            #  `ndarray` with values [9.024, 7.7627]
 
-    [1]: Lee Clewlow, Javier Llanos, Chris Strickland, Caracas Venezuela
-    Pricing Exotic Options in a Black-Scholes World, 1994
-    https://warwick.ac.uk/fac/soc/wbs/subjects/finance/research/wpaperseries/1994/94-54.pdf
-    [2]: Espen Gaarder Haug, The Complete Guide to Option Pricing Formulas,
-    2nd Edition, 1997
+    References:
+        [1]: Lee Clewlow, Javier Llanos, Chris Strickland, Caracas Venezuela
+        Pricing Exotic Options in a Black-Scholes World, 1994 
+        https://warwick.ac.uk/fac/soc/wbs/subjects/finance/research/wpaperseries/1994/94-54.pdf
+        
+        [2]: Espen Gaarder Haug, The Complete Guide to Option Pricing Formulas,
+        2nd Edition, 1997
 
     Args:
         volatilities: Real `ndarray` of any shape and dtype. The volatilities to
@@ -439,31 +436,29 @@ def binary_price(*,
     probability that the asset will end up higher (resp. lower) than the
     strike price at expiry.
 
-    #### Example
+    Example:
+        ::
+        
+            # Price a batch of 5 binary call options.
+            volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+            forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+            # Strikes will automatically be broadcasted to shape [5].
+            strikes = np.array([3.0])
+            # Expiries will be broadcast to shape [5], i.e. each option has strike=3
+            # and expiry = 1.
+            expiries = 1.0
+            computed_prices = jqf.black_scholes.binary_price(
+                volatilities=volatilities,
+                strikes=strikes,
+                expiries=expiries,
+                forwards=forwards)
+            # Expected print output of prices:
+            # [0.         0.         0.15865525 0.99764937 0.85927418]
 
-    ```python
-    # Price a batch of 5 binary call options.
-    volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
-    forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    # Strikes will automatically be broadcasted to shape [5].
-    strikes = np.array([3.0])
-    # Expiries will be broadcast to shape [5], i.e. each option has strike=3
-    # and expiry = 1.
-    expiries = 1.0
-    computed_prices = jqf.black_scholes.binary_price(
-        volatilities=volatilities,
-        strikes=strikes,
-        expiries=expiries,
-        forwards=forwards)
-    # Expected print output of prices:
-    # [0.         0.         0.15865525 0.99764937 0.85927418]
-    ```
-
-    #### References:
-
-    [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
-    [2] Wikipedia contributors. Binary option. Available at:
-    https://en.wikipedia.org/w/index.php?title=Binary_option
+    References:
+        [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
+        
+        [2] Wikipedia contributors. Binary option. Available at: https://en.wikipedia.org/w/index.php?title=Binary_option
 
     Args:
         volatilities: Real `ndarray` of any shape and dtype. The volatilities to
@@ -584,82 +579,77 @@ def asset_or_nothing_price(*,
     The asset-or-nothing call (resp. put) pays out one unit of the underlying
     asset if the spot is above (resp. below) the strike at maturity.
 
-    #### Example
+    Example:
+    
+        :: 
+        
+            # Price a batch of 5 asset_or_nothing call and put options.
+            volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
+            forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+            # Strikes will automatically be broadcasted to shape [5].
+            strikes = np.array([3.0])
+            # Expiries will be broadcast to shape [5], i.e. each option has strike=3
+            # and expiry = 1.
+            expiries = 1.0
+            computed_prices = jqf.black_scholes.asset_or_nothing_price(volatilities=volatilities,strikes=strikes,expiries=expiries,forwards=forwards)
+            # Expected print output of prices:
+            # [0., 2., 2.52403424, 3.99315108, 4.65085383]
 
-    ```python
-    # Price a batch of 5 asset_or_nothing call and put options.
-    volatilities = np.array([0.0001, 102.0, 2.0, 0.1, 0.4])
-    forwards = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-    # Strikes will automatically be broadcasted to shape [5].
-    strikes = np.array([3.0])
-    # Expiries will be broadcast to shape [5], i.e. each option has strike=3
-    # and expiry = 1.
-    expiries = 1.0
-    computed_prices = jqf.black_scholes.asset_or_nothing_price(
-        volatilities=volatilities,
-        strikes=strikes,
-        expiries=expiries,
-        forwards=forwards)
-    # Expected print output of prices:
-    # [0., 2., 2.52403424, 3.99315108, 4.65085383]
-    ```
-
-    #### References:
-
-    [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
-    [2] https://en.wikipedia.org/wiki/Binary_option#Asset-or-nothing_call
+    References:
+        [1] Hull, John C., Options, Futures and Other Derivatives. Pearson, 2018.
+        
+        [2] https://en.wikipedia.org/wiki/Binary_option#Asset-or-nothing_call
 
     Args:
-    volatilities: Real `ndarray` of any shape and dtype. The volatilities to
-        expiry of the options to price.
-    strikes: A real `ndarray` of the same dtype and compatible shape as
-        `volatilities`. The strikes of the options to be priced.
-    expiries: A real `ndarray` of same dtype and compatible shape as
-        `volatilities`. The expiry of each option.
-    spots: A real `ndarray` of any shape that broadcasts to the shape of the
-        `volatilities`. The current spot price of the underlying. Either this
-        argument or the `forwards` (but not both) must be supplied.
-    forwards: A real `ndarray` of any shape that broadcasts to the shape of
-        `volatilities`. The forwards to maturity. Either this argument or the
-        `spots` must be supplied but both must not be supplied.
-    discount_rates: An optional real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`. If
-        not `None`, discount factors are calculated as e^(-rT), where r are the
-        discount rates, or risk free rates. At most one of discount_rates and
-        discount_factors can be supplied.
-        Default value: `None`, equivalent to r = 0 and discount factors = 1 when
-        discount_factors also not given.
-    dividend_rates: An optional real `ndarray` of same dtype as the
-        `volatilities` and of the shape that broadcasts with `volatilities`.
-        Default value: `None`, equivalent to q = 0.
-    discount_factors: An optional real `ndarray` of same dtype as the
-        `volatilities`. If not `None`, these are the discount factors to expiry
-        (i.e. e^(-rT)). Mutually exclusive with discount_rates. If neither is
-        given, no discounting is applied (i.e. the undiscounted option price is
-        returned). If `spots` is supplied and `discount_factors` is not `None`
-        then this is also used to compute the forwards to expiry. At most one of
-        `discount_rates` and `discount_factors` can be supplied.
-        Default value: `None`, which maps to e^(-rT) calculated from
-        discount_rates.
-    is_call_options: A boolean `ndarray` of a shape compatible with
-        `volatilities`. Indicates whether the option is a call (if True) or a put
-        (if False). If not supplied, call options are assumed.
-    is_normal_volatility: An optional Python boolean specifying whether the
-        `volatilities` correspond to lognormal Black volatility (if False) or
-        normal Black volatility (if True).
-        Default value: False, which corresponds to lognormal volatility.
-    dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
-        `ndarray` data type conversion. 
-        Default value: `None`.
+        volatilities: Real `ndarray` of any shape and dtype. The volatilities to
+            expiry of the options to price.
+        strikes: A real `ndarray` of the same dtype and compatible shape as
+            `volatilities`. The strikes of the options to be priced.
+        expiries: A real `ndarray` of same dtype and compatible shape as
+            `volatilities`. The expiry of each option.
+        spots: A real `ndarray` of any shape that broadcasts to the shape of the
+            `volatilities`. The current spot price of the underlying. Either this
+            argument or the `forwards` (but not both) must be supplied.
+        forwards: A real `ndarray` of any shape that broadcasts to the shape of
+            `volatilities`. The forwards to maturity. Either this argument or the
+            `spots` must be supplied but both must not be supplied.
+        discount_rates: An optional real `ndarray` of same dtype as the
+            `volatilities` and of the shape that broadcasts with `volatilities`. If
+            not `None`, discount factors are calculated as e^(-rT), where r are the
+            discount rates, or risk free rates. At most one of discount_rates and
+            discount_factors can be supplied.
+            Default value: `None`, equivalent to r = 0 and discount factors = 1 when
+            discount_factors also not given.
+        dividend_rates: An optional real `ndarray` of same dtype as the
+            `volatilities` and of the shape that broadcasts with `volatilities`.
+            Default value: `None`, equivalent to q = 0.
+        discount_factors: An optional real `ndarray` of same dtype as the
+            `volatilities`. If not `None`, these are the discount factors to expiry
+            (i.e. e^(-rT)). Mutually exclusive with discount_rates. If neither is
+            given, no discounting is applied (i.e. the undiscounted option price is
+            returned). If `spots` is supplied and `discount_factors` is not `None`
+            then this is also used to compute the forwards to expiry. At most one of
+            `discount_rates` and `discount_factors` can be supplied.
+            Default value: `None`, which maps to e^(-rT) calculated from
+            discount_rates.
+        is_call_options: A boolean `ndarray` of a shape compatible with
+            `volatilities`. Indicates whether the option is a call (if True) or a put
+            (if False). If not supplied, call options are assumed.
+        is_normal_volatility: An optional Python boolean specifying whether the
+            `volatilities` correspond to lognormal Black volatility (if False) or
+            normal Black volatility (if True).
+            Default value: False, which corresponds to lognormal volatility.
+        dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+            `ndarray` data type conversion. 
+            Default value: `None`.
 
     Returns:
-    option_prices: A `ndarray` of the same shape as `forwards`. The Black
-    Scholes price of the options.
+        option_prices: A `ndarray` of the same shape as `forwards`. The Black Scholes price of the options.
 
     Raises:
-    ValueError: If both `forwards` and `spots` are supplied or if neither is
-        supplied.
-    ValueError: If both `discount_rates` and `discount_factors` is supplied.
+        ValueError: If both `forwards` and `spots` are supplied or if neither is
+            supplied.
+        ValueError: If both `discount_rates` and `discount_factors` is supplied.
     """
     if (spots is None) == (forwards is None):
         raise ValueError('Either spots or forwards must be supplied but not both.')
@@ -741,104 +731,104 @@ def swaption_price(*,
     date (or the inception date) of the swap coincides with the expiry of the
     swaption.
 
-    #### Example
-    The example shows how value a batch of 1y x 1y and 1y x 2y swaptions using the
-    Black (normal) model for the swap rate.
+    Example:
+    
+        The example shows how value a batch of 1y x 1y and 1y x 2y swaptions using the
+        Black (normal) model for the swap rate. ::
 
-    ````python
-    import numpy as np
-    import jax.numpy as jnp
-    import jax_quant_finance as jqf
 
-    dtype = jnp.float64
+            import numpy as np
+            import jax.numpy as jnp
+            import jax_quant_finance as jqf
 
-    volatilities = [0.01, 0.005]
-    expiries = [1.0, 1.0]
-    float_leg_start_times = [[1.0, 1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0],
-                            [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75]]
-    float_leg_end_times = [[1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0, 2.0],
-                            [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]]
-    fixed_leg_payment_times = [[1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0, 2.0],
-                                [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]]
-    float_leg_daycount_fractions = [[0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0],
-                                    [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-                                    0.25]]
-    fixed_leg_daycount_fractions = [[0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0],
-                                    [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
-                                    0.25]]
-    fixed_leg_coupon = [0.011, 0.011]
-    discount_fn = lambda x: np.exp(-0.01 * np.array(x))
-    price = self.evaluate(
-    jqf.black_scholes.swaption_price(
-        volatilities=volatilities,
-        expiries=expiries,
-        floating_leg_start_times=float_leg_start_times,
-        floating_leg_end_times=float_leg_end_times,
-        fixed_leg_payment_times=fixed_leg_payment_times,
-        floating_leg_daycount_fractions=float_leg_daycount_fractions,
-        fixed_leg_daycount_fractions=fixed_leg_daycount_fractions,
-        fixed_leg_coupon=fixed_leg_coupon,
-        floating_leg_start_times_discount_factors=discount_fn(
-            float_leg_start_times),
-        floating_leg_end_times_discount_factors=discount_fn(
-            float_leg_end_times),
-        fixed_leg_payment_times_discount_factors=discount_fn(
-            fixed_leg_payment_times),
-        is_normal_volatility=is_normal_model,
-        notional=100.,
-        dtype=dtype))
-    # Expected value: [0.3458467885511461, 0.3014786656395892] # shape = (2,)
-    ````
+            dtype = jnp.float64
+
+            volatilities = [0.01, 0.005]
+            expiries = [1.0, 1.0]
+            float_leg_start_times = [[1.0, 1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0],
+                                    [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75]]
+            float_leg_end_times = [[1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0, 2.0],
+                                    [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]]
+            fixed_leg_payment_times = [[1.25, 1.5, 1.75, 2.0, 2.0, 2.0, 2.0, 2.0],
+                                        [1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]]
+            float_leg_daycount_fractions = [[0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0],
+                                            [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                                            0.25]]
+            fixed_leg_daycount_fractions = [[0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0, 0.0],
+                                            [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+                                            0.25]]
+            fixed_leg_coupon = [0.011, 0.011]
+            discount_fn = lambda x: np.exp(-0.01 * np.array(x))
+            price = self.evaluate(
+            jqf.black_scholes.swaption_price(
+                volatilities=volatilities,
+                expiries=expiries,
+                floating_leg_start_times=float_leg_start_times,
+                floating_leg_end_times=float_leg_end_times,
+                fixed_leg_payment_times=fixed_leg_payment_times,
+                floating_leg_daycount_fractions=float_leg_daycount_fractions,
+                fixed_leg_daycount_fractions=fixed_leg_daycount_fractions,
+                fixed_leg_coupon=fixed_leg_coupon,
+                floating_leg_start_times_discount_factors=discount_fn(
+                    float_leg_start_times),
+                floating_leg_end_times_discount_factors=discount_fn(
+                    float_leg_end_times),
+                fixed_leg_payment_times_discount_factors=discount_fn(
+                    fixed_leg_payment_times),
+                is_normal_volatility=is_normal_model,
+                notional=100.,
+                dtype=dtype))
+            # Expected value: [0.3458467885511461, 0.3014786656395892] # shape = (2,)
 
     Args:
-    volatilities: Real `ndarray` of any shape and dtype. The Black volatilities
-        of the swaptions to price. The shape of this input determines the number
-        (and shape) of swaptions to be priced and the shape of the output.
-    expiries: A real `ndarray` of same shape and dtype as `volatilities`. The
-        time to expiration of the swaptions.
-    floating_leg_start_times: A real `ndarray` of the same dtype as
-        `volatilities`. The times when accrual begins for each payment in the
-        floating leg. The shape of this input should be `expiries.shape + [m]` or
-        `batch_shape + [m]` where `m` denotes the number of floating payments in
-        each leg.
-    floating_leg_end_times: A real `ndarray` of the same dtype as `volatilities`.
-        The times when accrual ends for each payment in the floating leg. The
-        shape of this input should be `batch_shape + [m]` where `m` denotes
-        the number of floating payments in each leg.
-    fixed_leg_payment_times: A real `ndarray` of the same dtype as
-        `volatilities`.  The payment times for each payment in the fixed leg.
-        The shape of this input should be `batch_shape + [n]` where `n` denotes
-        the number of fixed payments in each leg.
-    floating_leg_daycount_fractions: A real `ndarray` of the same dtype and
-        compatible shape as `floating_leg_start_times`. The daycount fractions
-        for each payment in the floating leg.
-    fixed_leg_daycount_fractions: A real `ndarray` of the same dtype and
-        compatible shape as `fixed_leg_payment_times`. The daycount fractions
-        for each payment in the fixed leg.
-    fixed_leg_coupon: A real `ndarray` of the same dtype and shape compatible
-        to `batch_shape`. The fixed coupon rate for each payment in the fixed leg.
-    floating_leg_start_times_discount_factors: A real `ndarray` of the same
-        shape and dtype as `floating_leg_start_times`. The discount factors
-        corresponding to `floating_leg_start_times`.
-    floating_leg_end_times_discount_factors: A real `ndarray` of the same
-        shape and dtype as `floating_leg_end_times`. The discount factors
-        corresponding to `floating_leg_end_times`.
-    fixed_leg_payment_times_discount_factors: A real `ndarray` of the same
-        shape and dtype as `fixed_leg_payment_times`. The discount factors
-        corresponding to `fixed_leg_payment_times`.
-    notional: An optional `ndarray` of same dtype and compatible shape as
-        `volatilities` specifying the notional amount for the underlying swap.
-        Default value: None in which case the notional is set to 1.
-    is_payer_swaption: A boolean `ndarray` of a shape compatible with `expiries`.
-        Indicates whether the swaption is a payer (if True) or a receiver
-        (if False) swaption. If not supplied, payer swaptions are assumed.
-    is_normal_volatility: An optional Python boolean specifying whether the
-        `volatilities` correspond to normal Black volatility (if True) or
-        lognormal Black volatility (if False).
-        Default value: True, which corresponds to normal volatility.
-    dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
-        `ndarray` data type conversion. 
-        Default value: `None`.
+        volatilities: Real `ndarray` of any shape and dtype. The Black volatilities
+            of the swaptions to price. The shape of this input determines the number
+            (and shape) of swaptions to be priced and the shape of the output.
+        expiries: A real `ndarray` of same shape and dtype as `volatilities`. The
+            time to expiration of the swaptions.
+        floating_leg_start_times: A real `ndarray` of the same dtype as
+            `volatilities`. The times when accrual begins for each payment in the
+            floating leg. The shape of this input should be `expiries.shape + [m]` or
+            `batch_shape + [m]` where `m` denotes the number of floating payments in
+            each leg.
+        floating_leg_end_times: A real `ndarray` of the same dtype as `volatilities`.
+            The times when accrual ends for each payment in the floating leg. The
+            shape of this input should be `batch_shape + [m]` where `m` denotes
+            the number of floating payments in each leg.
+        fixed_leg_payment_times: A real `ndarray` of the same dtype as
+            `volatilities`.  The payment times for each payment in the fixed leg.
+            The shape of this input should be `batch_shape + [n]` where `n` denotes
+            the number of fixed payments in each leg.
+        floating_leg_daycount_fractions: A real `ndarray` of the same dtype and
+            compatible shape as `floating_leg_start_times`. The daycount fractions
+            for each payment in the floating leg.
+        fixed_leg_daycount_fractions: A real `ndarray` of the same dtype and
+            compatible shape as `fixed_leg_payment_times`. The daycount fractions
+            for each payment in the fixed leg.
+        fixed_leg_coupon: A real `ndarray` of the same dtype and shape compatible
+            to `batch_shape`. The fixed coupon rate for each payment in the fixed leg.
+        floating_leg_start_times_discount_factors: A real `ndarray` of the same
+            shape and dtype as `floating_leg_start_times`. The discount factors
+            corresponding to `floating_leg_start_times`.
+        floating_leg_end_times_discount_factors: A real `ndarray` of the same
+            shape and dtype as `floating_leg_end_times`. The discount factors
+            corresponding to `floating_leg_end_times`.
+        fixed_leg_payment_times_discount_factors: A real `ndarray` of the same
+            shape and dtype as `fixed_leg_payment_times`. The discount factors
+            corresponding to `fixed_leg_payment_times`.
+        notional: An optional `ndarray` of same dtype and compatible shape as
+            `volatilities` specifying the notional amount for the underlying swap.
+            Default value: None in which case the notional is set to 1.
+        is_payer_swaption: A boolean `ndarray` of a shape compatible with `expiries`.
+            Indicates whether the swaption is a payer (if True) or a receiver
+            (if False) swaption. If not supplied, payer swaptions are assumed.
+        is_normal_volatility: An optional Python boolean specifying whether the
+            `volatilities` correspond to normal Black volatility (if True) or
+            lognormal Black volatility (if False).
+            Default value: True, which corresponds to normal volatility.
+        dtype: Optional `jnp.dtype`. If supplied, the dtype to be used for 
+            `ndarray` data type conversion. 
+            Default value: `None`.
 
     Returns:
         A `ndarray` of real dtype and shape `batch_shape` containing the

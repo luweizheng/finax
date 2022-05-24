@@ -124,8 +124,7 @@ def _solve(
           inner_first_order_coeff_fn=inner_first_order_coeff_fn,
           num_steps_performed=steps_performed
         )
-        
-        print(f"next fs: {next_fs}")
+    
         
         if values_transform_fn is not None:
             next_xs, next_fs = values_transform_fn(t_next, next_xs, next_fs)
@@ -138,9 +137,7 @@ def _solve(
     
     
     
-    print(f"start:{start_time}")
     (_, final_time, final_coords, final_values, steps_performed) = while_loop(loop_cond, loop_body, loop_var)
-    print(f"final values: {final_coords}")
     return final_values, final_coords, final_time, steps_performed 
         
 

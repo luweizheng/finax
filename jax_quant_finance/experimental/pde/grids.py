@@ -1,5 +1,4 @@
 import jax.numpy as jnp
-from numpy import int32
 
 
 def uniform_grid(minimums, maximums, sizes, dtype=None, validate_args=False):

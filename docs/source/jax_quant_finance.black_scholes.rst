@@ -8,7 +8,7 @@ jax\_quant\_finance.black\_scholes.vanilla\_prices module
 ---------------------------------------------------------
 
 .. automodule:: jax_quant_finance.black_scholes.vanilla_prices
-   :members:
+   :members: option_price, barrier_price
    :undoc-members:
    :show-inheritance:
 
