@@ -33,7 +33,7 @@ def _ensure_jax_install():
     if (distutils.version.LooseVersion(jax.__version__) <
         distutils.version.LooseVersion(_REQUIRED_JAX_VERSION)):
         raise ImportError(
-            "This version of JAX Quant Finance requires JAX "
+            "This version of FINAX requires JAX "
             "version >= {required}; Detected an installation of version {present}. "
             "Please upgrade JAX to proceed.".format(
                 required=_REQUIRED_JAX_VERSION, present=jax.__version__))
@@ -46,6 +46,7 @@ from finax import math
 from finax import models
 from finax import utils
 from finax import rates
+from finax import experimental
 
 
 _allowed_symbols = [
@@ -53,5 +54,6 @@ _allowed_symbols = [
     "math",
     "models",
     "utils",
-    "rates"
+    "rates",
+    "experimental"
 ]
