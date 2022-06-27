@@ -1,4 +1,6 @@
 """Utility methods for model building."""
+from functools import partial
+from jax import jit
 import jax.numpy as jnp
 
 from finax.utils import ops
@@ -80,7 +82,7 @@ def prepare_grid(*, times, time_step, dtype, tolerance=None,
     return all_times, mask, time_indices
 
 
-def _grid_from_time_step(*, times, time_step, dtype, tolerance):
+def _grid_from_time_step(times, time_step, dtype, tolerance):
     """Creates a time grid from an input time step."""
     grid = jnp.arange(start=0.0, stop=times[-1], step=time_step, dtype=dtype)
     all_times = jnp.concatenate([times, grid], axis=0)

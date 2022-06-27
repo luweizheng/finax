@@ -2,8 +2,7 @@
 
 from finax.utils import shape
 from finax.utils import ops
-from finax.utils.enums import LoopType
-from finax.utils.enums import ParallelType
+from finax.utils.enums import LoopType, ParallelType
 
 __allowed_symbols = [
     'shape',
